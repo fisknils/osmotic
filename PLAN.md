@@ -2,9 +2,19 @@
 
 ## Prompts
 
-1. "now that we have a github repo, we should add it to package.json"
-2. "Can the "author" field be an array?"
-3. "Set my handle (fisknils) as author. I'm not comfortable sharing my email. as contributors, you may add me and you."
+1. The public GitHub repository had just been created. Claude pointed out that `package.json` had no `repository`,
+   `homepage` or `bugs` fields, so the npm page wouldn't link to it.
+
+   > now that we have a github repo, we should add it to package.json
+
+2. Claude had added the three fields. `author` was still an empty string.
+
+   > Can the "author" field be an array?
+
+3. Claude explained that `author` is a single person and others go in `contributors`, offered to set `author` to the git
+   user name, and asked whether to include an email, since it would be public on npm.
+
+   > Set my handle (fisknils) as author. I'm not comfortable sharing my email. as contributors, you may add me and you.
 
 ## Interpretation
 
