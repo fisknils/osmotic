@@ -21,6 +21,18 @@
 
    > or compare the max usage from two different chains
 
+4. Later, after other pull requests were merged, the maintainer asked to bring this one up to date and review it.
+
+   > rebase PR 7 and have the review agent look at it
+
+5. The review found two should-fix problems: `withoutPage()` in `recurse()` had no test, and importing the test helpers
+   turned on `--expose-gc` in every test process. It also suggested tightening the live-DOM limit, which always measured
+
+   1. Claude recommended fixing both, tightening the limit to exactly 1, keeping the 1.5 MB two-chain limit, and
+      updating the test count.
+
+   > I concur. Apply your recommendations and merge.
+
 ## Interpretation
 
 Add tests that fail when a change makes osmotic keep memory it should release:
@@ -53,8 +65,9 @@ Out: changes to osmotic itself, and comparing memory between `master` and a bran
 
 ## Acceptance criteria
 
-- [x] Crawling a 30-page archive with `recurse()`, at most 3 page DOMs are alive at any page.
-- [x] With one slot and a page linking to 20 articles, the page's DOM is collected while its articles are still queued.
+- [x] Crawling a 30-page archive with `recurse()`, exactly 1 page DOM is alive at each page.
+- [x] With one slot and a page linking to 20 articles, the page's DOM is collected while its articles are still queued,
+      both with `follow()` and with `recurse()`.
 - [x] Extracting a value of at least 13 characters from each of 10 pages of 1 MB keeps less than 3 MB alive.
 - [x] The peak heap of a 168-page crawl is less than 1.5 MB above that of a 42-page crawl.
 - [x] Each test fails when the leak it guards against is introduced, except where Decisions says why it can't.
@@ -66,8 +79,9 @@ None.
 
 ## Impact on the rest of the codebase
 
-- Checked: forcing garbage collection with `v8.setFlagsFromString('--expose-gc')` affects only the test file's own
-  process, since each test file runs in its own; the scenario sites and helpers other tests use (only additions); and
+- Checked: forcing garbage collection with `v8.setFlagsFromString('--expose-gc')` happens on the first
+  `collectGarbage()` call, so only the processes of test files that collect garbage get the flag, and importing the
+  helpers doesn't set it; the scenario sites and helpers other tests use (only additions); and
   the run time of `npm test`.
 - Found: `npm test` takes about 7 seconds longer, mostly the two-chain comparison, which forces a garbage collection at
   every page of three crawls.
@@ -94,10 +108,21 @@ None.
   two-chain test (prompt 3): that catches every leak that grows with the crawl, in every `npm test`, without building a
   second version or comparing two noisy runs. What only the `master` comparison would catch is a constant increase that
   doesn't grow with the crawl, judged not worth the cost and noise for now.
+- Review of the pull request (prompt 5): tests changed after review, each because it checked less than its criterion
+  needs:
+  - The live-DOM limit was `<= 3`, but forced garbage collection makes the count exactly 1 at every page, on Node.js 22
+    and 24. A regression that kept one or two extra pages would have passed, so the test now expects 1 at each page.
+  - The queued-requests test only covered `follow()`, although `recurse()` relies on `withoutPage()` the same way. It
+    now runs for both, and skips the listing page's own pass in `recurse()`, where the listing is alive by design.
+  - `--expose-gc` was set when the helpers module loaded, so every test file got it. It's now set on first use.
+- The two-chain limit stays at 1.5 MB, although the review measured under 0.25 MB of noise and suggested about
+  0.75 MB could work. A tighter limit makes false failures on slower or busier CI runners more likely, for little gain.
 
 ## Verification
 
-`npm test` passes: 104 tests. The memory tests passed in each of five runs in a row, at about 7 seconds.
+`npm test` passes: 115 tests after the rebase onto `master` and the review fixes. The memory tests passed in each of five
+runs in a row, at about 7 seconds, and again in three runs after the review fixes. The review also ran them five times
+each on Node.js 22 and 24.
 
 Each leak was introduced on purpose and the tests were run against it:
 
@@ -105,6 +130,7 @@ Each leak was introduced on purpose and the tests were run against it:
 | ---------------------------------------------------- | ----------------------------------------------------------- |
 | `recurse()` awaits its branches instead of returning | 30 of 30 DOMs alive in the long-crawl test; two-chain fails |
 | `follow()` carries the page into queued requests     | The queued-requests test fails                              |
+| `recurse()` carries the page into queued requests    | The queued-requests test fails for `recurse()`              |
 | `detach()` removed                                   | No test fails (see Decisions)                               |
 | Every page's DOM kept on the instance                | Two-chain fails: 42 MB against 159 MB                       |
 | 20 kB kept per page                                  | Two-chain fails: "about 21 kB more per page"                |
