@@ -31,14 +31,15 @@ None. 3.1.0 is unpublished; the fix is folded into it.
 
 ## Scope
 
-- `pick()` in `src/extract.ts`, tests in `test/set.ts`, the 3.1.0 entry in `CHANGELOG.md`.
+- `pick()` in `src/extract.ts`, tests in `test/set.ts`, the 3.1.0 entry in `CHANGELOG.md`, and the list spec note in
+  `README.md`.
 - Left out: posting the review on #10.
 
 ## Acceptance criteria
 
-- [ ] An XPath-style index on a list selector works: `['.specs tr[2]', { label: 'td[1]' }]` gives
+- [x] An XPath-style index on a list selector works: `['.specs tr[2]', { label: 'td[1]' }]` gives
       `[{ label: 'Colour' }]`. (test/set.ts)
-- [ ] A list selector with `@attr` fails the run with an error that says the list selector takes no attribute.
+- [x] A list selector with `@attr` fails the run with an error that says the list selector takes no attribute.
       (test/set.ts)
 
 ## Affected public API
@@ -62,5 +63,8 @@ None. 3.1.0 is unpublished; the fix is folded into it.
   and it was changed in the tests commit, before the code.
 
 ## Verification
+
+- The two tests in `test/set.ts` were committed before the fix and failed against it: the index case gave `[]`, and
+  the `@attr` case didn't throw. With the fix, `npm test` passes (110 tests) and the Prettier check is clean.
 
 ## Follow-ups
