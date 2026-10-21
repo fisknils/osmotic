@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Osmotic } from '../src/index.cjs';
-import { createSite } from './helpers/index.js';
+import { createSite, openSite } from './helpers/index.js';
 
 test('serves an HTML string with status 200', async () => {
 	const site = await createSite({ '/': '<h1>Home</h1>' });
@@ -100,4 +100,22 @@ test('serves a multi-page site to a chain', async () => {
 	} finally {
 		await site.close();
 	}
+});
+
+test('fills in {{origin}} and {{otherOrigin}} in bodies and redirects', async (t) => {
+	const site = await openSite(t, {
+		'/': '<a href="{{otherOrigin}}/x">{{origin}}</a>',
+		'/away': { redirect: '{{otherOrigin}}/' },
+	});
+	assert.equal(await (await fetch(site.url('/'))).text(), `<a href="${site.otherOrigin}/x">${site.origin}</a>`);
+	const res = await fetch(site.url('/away'), { redirect: 'manual' });
+	assert.equal(res.headers.get('location'), site.otherOrigin + '/');
+});
+
+test('waits before responding, and counts the most requests in progress at once', async (t) => {
+	const site = await openSite(t, { '/slow': { body: 'slow', wait: 100 } });
+	const started = Date.now();
+	await Promise.all([fetch(site.url('/slow')), fetch(site.url('/slow')), fetch(site.url('/slow'))]);
+	assert.ok(Date.now() - started >= 95);
+	assert.equal(site.maxActive(), 3);
 });
