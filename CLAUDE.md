@@ -77,6 +77,8 @@ When a test fails against new code, fix the code, not the test. A test may only 
 
 Commit the tests before the code, so the history shows they came first.
 
+A bugfix may skip the automated test only when one isn't practical, such as for packaging or install problems, documentation, or behavior that depends on real sites, timing or the environment. "It takes effort" is not a reason. Type-only fixes are tested in `test-d/`. When skipping, the `Verification` section of `PLAN.md` must say why a test isn't practical, and how the fix was checked instead, as steps someone else can repeat.
+
 ## Commits
 
 - Commit messages should be short and informative.
