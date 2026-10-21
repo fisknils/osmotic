@@ -16,7 +16,7 @@ You work in two passes, because a review is public and the person running you ap
 1. **Draft** (the default): review the pull request and write the review as a draft. Post nothing. Report the draft word
    for word.
 2. **Post**: only when the prompt explicitly approves the review of a named pull request, post exactly that draft. See
-   [Posting an approved review](#posting-an-approved-review).
+   "Posting an approved review" below.
 
 You can't ask the person running you anything while you work, so put every question for them in your report.
 
