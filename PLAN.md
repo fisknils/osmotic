@@ -34,6 +34,13 @@
 
    > No, add full TSDoc right away
 
+7. The pr-review agent found one blocking problem (the new `host` field hid a plugin command named `host`) and
+   ten TSDoc statements, tags and links that didn't match the code. Claude recommended posting the review, fixing
+   everything on this branch with `#host`, settling prompt 3 as methods, opening an issue for the older fields with
+   the same problem, and reviewing again before merging.
+
+   > yes
+
 ## Interpretation
 
 Move `src/` into the layout CLAUDE.md describes, with no behavior changes:
@@ -68,11 +75,16 @@ the internal paths in `dist/` aren't reachable by users.
 
 ## Decisions
 
-- Prompt 3, open: Claude recommended keeping the command methods as methods, not arrow-function properties. Arrow
-  properties live on each instance,
-  not on the prototype, and `Osmotic.command()` and `Osmotic.plugins()` detect taken names with
+- Prompt 3, settled in prompt 7: the command methods stay methods, not arrow-function properties. Arrow properties
+  live on each instance, not on the prototype, and `Osmotic.command()` and `Osmotic.plugins()` detect taken names with
   `name in Osmotic.prototype`. A plugin could then register `get` without an error, and the instance property would
-  silently shadow it. Arrow properties also can't be overridden or reached through `super` in a subclass.
+  silently shadow it. Arrow properties also can't be overridden or reached through `super` in a subclass. The review
+  agreed.
+- The review found the same problem in this branch's own `host` field, which made a plugin command named `host`
+  register but fail when called, while it works on `master`. `host` is now an ES private field (`#host`), which isn't
+  a property, with a regression test in `test/extend.ts` that failed before the fix. The older fields with the same
+  problem on `master` (`opts`, `steps`, `exports` and others) are issue #16, to fix on its own `fix/` branch, since
+  that changes behavior.
 - `links()` in the old `extract.ts` is now `collectLinks()` in `utils/collect-links.ts`, named after its file and no
   longer sharing a name with `Osmotic#links()`.
 - `test/create-site.ts` stays: it holds the tests for the `createSite()` helper, one file per feature as CLAUDE.md
@@ -80,8 +92,9 @@ the internal paths in `dist/` aren't reachable by users.
 
 ## Verification
 
-- `npm test` passes, 115 tests, with no test changed except the paths that tests use to augment internal modules
-  (`declare module '../src/…'`) and a comment in `test/memory.ts` naming the file of `detach()`. This includes the
+- `npm test` passes, 116 tests: the 115 from `master`, unchanged except the paths that tests use to augment internal
+  modules (`declare module '../src/…'`) and a comment in `test/memory.ts` naming the file of `detach()`, plus the
+  regression test for a command named `host`. This includes the
   type tests, the memory tests and `test/package.ts`, which loads both entry points from `dist/`.
 - `src/index.cts` exports the same 29 names as on `master`.
 - The plugins augment `declare module 'osmotic'`, not internal paths, and `exports` in `package.json` only exposes the
