@@ -3,3 +3,6 @@ node_modules
 
 # Issue triage drafts, see .claude/agents/issue-triage.md
 .triage/
+
+# Personal Claude Code settings, such as permission rules
+.claude/settings.local.json
