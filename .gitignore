@@ -1,2 +1,5 @@
 dist
 node_modules
+
+# Issue triage drafts, see .claude/agents/issue-triage.md
+.triage/
