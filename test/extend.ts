@@ -7,6 +7,7 @@ declare module '../src/core/Osmotic.js' {
 	interface Osmotic {
 		extendTestPause(ms: number): this;
 		extendTestFirstLink(): this;
+		host(): this;
 	}
 }
 
@@ -92,6 +93,15 @@ test('custom commands can use this.links() and this.fetchPage()', async (t) => {
 	});
 	const { rows } = await scrape(Osmotic.get(site.url('/category/lamps')).extendTestFirstLink().set({ name: 'h1' }));
 	assert.deepEqual(rows, [{ name: 'Desk lamp' }]);
+});
+
+// The commands reach the instance through a private CommandHost; it must not take a name
+// a plugin could register a command under
+test('a command named host can be registered and called', async (t) => {
+	const site = await openSite(t, shop);
+	Osmotic.command('host', () => (ctx, next) => next({ ...ctx, data: { ...ctx.data, host: new URL(ctx.url!).host } }));
+	const { rows } = await scrape(Osmotic.get(site.url('/')).host());
+	assert.deepEqual(rows, [{ host: new URL(site.url('/')).host }]);
 });
 
 test('a command name that already exists is rejected', () => {
