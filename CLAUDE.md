@@ -1,19 +1,25 @@
-For every new feature, create a feature branch. Name format: feature/branch-name
-For every fix, create a fix branch. Name format: fix/branch-name
+# Contributing
 
-Commit messages should be short and informative.
-If needed, split up changes (files) into many commits for more valuable commit messages.
+## Branches
 
-Before merging to master:
+- For every new feature, create a feature branch named `feature/branch-name`.
+- For every fix, create a fix branch named `fix/branch-name`.
 
-- The version in package.json must be bumped according to the semantic versioning standards.
-- CHANGELOG.md must be updated.
-- Read README.md and determine whether an update is necessary.
+## Commits
 
-After merging to master:
+- Commit messages should be short and informative.
+- If needed, split up changes (files) into several commits for more valuable commit messages.
 
-- the source branch should be deleted.
-- run `npm run build` and `npm publish`
+## Before merging to master
+
+- Bump the version in `package.json` according to [semantic versioning](https://semver.org/).
+- Update `CHANGELOG.md`.
+- Read `README.md` and determine whether an update is necessary.
+
+## After merging to master
+
+- Delete the source branch.
+- Run `npm run build` and `npm publish`.
 
 ## Project structure
 
