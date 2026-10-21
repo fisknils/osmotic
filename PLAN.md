@@ -7,6 +7,12 @@
 
    > The review-agent should be more picky. When it finds something that should be fixed, don't say ok for merge
 
+2. The pr-review agent reviewed #12 and found that the stricter verdict made the existing `PLAN.md` rule ("a finding
+   for later, not a blocker") a should-fix finding on every pull request, so it could never say "ready to merge". It
+   suggested stating that `PLAN.md` on the branch isn't a finding.
+
+   > post the review, make the fix and merge it without running the review agent again
+
 ## Interpretation
 
 Change `.claude/agents/pr-review.md` so that:
@@ -18,6 +24,7 @@ Change `.claude/agents/pr-review.md` so that:
 - The agent is pickier: it checks that every place describing the changed behavior was updated, including TSDoc, code
   comments, error messages, README and CHANGELOG, also on lines outside the diff; and when unsure between nit and
   should fix, it picks should fix.
+- `PLAN.md` on the branch is not a finding, since it is only removed right before merging.
 
 ## Type
 
