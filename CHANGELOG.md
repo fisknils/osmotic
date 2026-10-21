@@ -4,6 +4,17 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows
 [Semantic Versioning](https://semver.org/).
 
+## [2.1.0] - 2026-10-21
+
+### Added
+
+- `Osmotic.plugins(list)` loads plugins: npm packages that add commands and fetch
+  middleware. A plugin is an object `{ name, commands?, fetch? }`, or a function that
+  returns one. See [Plugins](README.md#plugins) for the format and publishing
+  conventions.
+- Exported types `OsmoticPlugin` and `PluginInput`.
+- `examples/plugin.js`.
+
 ## [2.0.1] - 2026-10-21
 
 ### Fixed
@@ -57,5 +68,7 @@ const { Osmotic } = require('osmotic');
 
 Last release as `@fisknils/osmo`.
 
+[2.1.0]: https://www.npmjs.com/package/osmotic/v/2.1.0
+[2.0.1]: https://www.npmjs.com/package/osmotic/v/2.0.1
 [2.0.0]: https://www.npmjs.com/package/osmotic/v/2.0.0
 [1.0.3]: https://www.npmjs.com/package/@fisknils/osmo/v/1.0.3

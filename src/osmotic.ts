@@ -4,6 +4,7 @@ import { CsvSink, type CsvOptions } from './csv.js';
 import { Emitter, type Handler, type OsmoticEvent, type RunStats, type SkipReason } from './events.js';
 import { links, pick } from './extract.js';
 import { fetchThrough } from './http.js';
+import { loadPlugins, pluginMiddleware, type PluginInput } from './plugins.js';
 import { RobotsCache } from './robots.js';
 import { builtinPseudos, normalizeSelector } from './selectors.js';
 import { SlotPool } from './slots.js';
@@ -107,6 +108,12 @@ export class Osmotic {
 	private readonly fetchMiddleware: FetchMiddleware[] = [];
 	private readonly events = new Emitter();
 	private state: RunState | null = null;
+	// Middleware from plugins loaded before this chain was created; runs after fetchMiddleware
+	private readonly pluginFetch: FetchMiddleware[] = [...pluginMiddleware];
+
+	constructor() {
+		for (const mw of this.pluginFetch) this.addHooks(mw);
+	}
 
 	/** Start a new chain by loading `url`. Shorthand for `new Osmotic().get(url)`. */
 	static get(url: string): Osmotic {
@@ -149,8 +156,7 @@ export class Osmotic {
 	 */
 	useFetch(mw: FetchMiddleware): this {
 		this.fetchMiddleware.push(mw);
-		if (mw.onStart) this.on('start', () => mw.onStart!());
-		if (mw.onEnd) this.on('end', () => mw.onEnd!());
+		this.addHooks(mw);
 		return this;
 	}
 
@@ -202,6 +208,30 @@ export class Osmotic {
 		(Osmotic.prototype as unknown as Record<string, unknown>)[name] = function (this: Osmotic, ...args: A) {
 			return this.add(factory.apply(this, args));
 		};
+	}
+
+	/**
+	 * Load plugins: their commands become available on every instance, and their fetch
+	 * middleware is added to every chain created afterwards, so load plugins first.
+	 *
+	 * Each entry is a plugin object, or a function returning one, which is called
+	 * without arguments. Loading the same entry again does nothing.
+	 *
+	 * @throws If an entry is not a valid plugin, another plugin with the same name is
+	 * loaded, or a command name is taken. Nothing in the list is loaded then.
+	 *
+	 * @example
+	 * ```ts
+	 * Osmotic.plugins([require('osmotic-plugin-playwright')]);
+	 * ```
+	 */
+	static plugins(list: PluginInput[]): typeof Osmotic {
+		loadPlugins(
+			list,
+			(name) => name in Osmotic.prototype,
+			(name, factory) => Osmotic.command(name, factory),
+		);
+		return Osmotic;
 	}
 
 	// --- Commands -------------------------------------------------------------
@@ -458,7 +488,13 @@ export class Osmotic {
 				...slot.headers,
 			},
 		};
-		return fetchThrough(this.fetchMiddleware, req);
+		return fetchThrough([...this.fetchMiddleware, ...this.pluginFetch], req);
+	}
+
+	// Register a middleware's own onStart/onEnd hooks as start/end handlers
+	private addHooks(mw: FetchMiddleware): void {
+		if (mw.onStart) this.on('start', () => mw.onStart!());
+		if (mw.onEnd) this.on('end', () => mw.onEnd!());
 	}
 
 	private async closeSinks(): Promise<void> {
