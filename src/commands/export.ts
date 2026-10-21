@@ -1,3 +1,4 @@
+import type { Osmotic } from '../core/Osmotic.js';
 import type { CommandHost } from '../core/command-host.js';
 import { exporterFor } from '../core/exporters.js';
 import { ExportTarget } from '../core/ExportTarget.js';

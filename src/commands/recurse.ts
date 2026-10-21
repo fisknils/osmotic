@@ -1,3 +1,4 @@
+import type { Osmotic } from '../core/Osmotic.js';
 import type { CommandHost } from '../core/command-host.js';
 import { all, pageOf, withoutPage } from '../core/page.js';
 import type { RecurseOptions } from '../types/commands.js';
@@ -11,6 +12,7 @@ import type { Context, Next, Step } from '../types/context.js';
  * @param spec - Where to find the links: `"selector@attr"`.
  * @param options - `sameDomain` and `exclude`.
  * @returns The step.
+ * @throws When the step runs before a page is loaded, or with an invalid selector.
  */
 export function recurseStep(
 	host: CommandHost,

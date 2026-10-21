@@ -1,9 +1,10 @@
+import type { Osmotic } from '../core/Osmotic.js';
 import type { CheerioAPI } from 'cheerio';
 import type { Data, PageNode } from './context.js';
 
 /**
  * The test for {@link Osmotic.filter}: a selector that passes when the current node
- * contains a match, or a function that passes when it returns true.
+ * contains a match, or a function that passes when it returns or resolves to a truthy value.
  */
 export type FilterTest = string | (($: CheerioAPI, node: PageNode, data: Data) => boolean | Promise<boolean>);
 

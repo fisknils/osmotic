@@ -1,3 +1,4 @@
+import type { Osmotic } from '../core/Osmotic.js';
 import type { Step } from '../types/context.js';
 
 /**

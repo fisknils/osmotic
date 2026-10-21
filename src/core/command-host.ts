@@ -1,3 +1,4 @@
+import type { Osmotic } from './Osmotic.js';
 import type { Context, Next } from '../types/context.js';
 import type { OsmoticOptions } from '../types/options.js';
 import type { ExportTarget } from './ExportTarget.js';
@@ -23,8 +24,8 @@ export interface CommandHost {
 	 * @param from - The context to carry over, without its page.
 	 * @param next - Continues the chain on the loaded page.
 	 * @param priority - The priority of the request, from {@link CommandHost.priority}.
-	 * @returns A promise that settles when the chain on the page has finished, or at once
-	 * if the page was skipped.
+	 * @returns A promise that settles when the chain on the page has finished, or once the
+	 * fetch attempt is over if the page was skipped or failed.
 	 */
 	visit(url: string, from: Context, next: Next, priority: number): Promise<void>;
 	/**

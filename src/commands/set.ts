@@ -1,3 +1,4 @@
+import type { Osmotic } from '../core/Osmotic.js';
 import type { CommandHost } from '../core/command-host.js';
 import { pageOf } from '../core/page.js';
 import type { Step } from '../types/context.js';
@@ -12,6 +13,8 @@ import { pick } from '../utils/pick.js';
  * the step runs.
  * @param fields - The specs to extract, by field name.
  * @returns The step.
+ * @throws When the step runs before a page is loaded, or a spec is malformed or has an invalid
+ * selector.
  */
 export function setStep(host: CommandHost, fields: Record<string, Spec>): Step {
 	return (ctx, next) => {

@@ -1,3 +1,4 @@
+import type { Osmotic } from '../core/Osmotic.js';
 import { pageOf } from '../core/page.js';
 import type { FilterTest } from '../types/commands.js';
 import type { Step } from '../types/context.js';
@@ -9,6 +10,7 @@ import { normalizeSelector } from '../utils/normalize-selector.js';
  * @param test - A selector that must match inside the current node, or a function that
  * must return or resolve to a truthy value.
  * @returns The step.
+ * @throws When the step runs before a page is loaded, or with an invalid selector.
  */
 export function filterStep(test: FilterTest): Step {
 	return (ctx, next) => {
