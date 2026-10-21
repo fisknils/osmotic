@@ -356,12 +356,119 @@ declare module 'osmotic' {
 The ESM and CommonJS entry points share a single `Osmotic` class, so a command
 registered through one is available through the other.
 
+## Plugins
+
+Plugins are npm packages that add commands and fetch middleware. Load them once,
+before building any chains:
+
+```js
+const { Osmotic } = require('osmotic');
+
+Osmotic.plugins([require('osmotic-plugin-playwright')]);
+
+Osmotic.get('https://example.com') /* ... */;
+```
+
+`Osmotic.plugins(list)` returns `Osmotic`, so it can also start a chain directly.
+
+- **Commands** from a plugin are available on every instance, like ones registered
+  with `Osmotic.command()`.
+- **Fetch middleware** from a plugin is added to every chain created after the plugin
+  is loaded. It runs after the chain's own `useFetch()` middleware, closest to the
+  network.
+- **Loading is all or nothing.** If any entry is invalid, has the same name as a
+  loaded plugin, or adds a command that already exists, `plugins()` throws and loads
+  nothing from the list.
+- Loading the same entry twice does nothing, so libraries can load the plugins they
+  depend on without coordinating.
+
+### Writing a plugin
+
+A plugin is an object with a `name` and at least one of `commands` and `fetch`:
+
+| Field      | Type                            | Description                                                        |
+| ---------- | ------------------------------- | ------------------------------------------------------------------ |
+| `name`     | `string`                        | Unique name, normally the package name.                            |
+| `commands` | `{ [name]: (...args) => step }` | Chainable commands, each a factory as in `Osmotic.command()`.      |
+| `fetch`    | `FetchMiddleware[]`             | Middleware for every request. `onStart` and `onEnd` hooks run too. |
+
+```js
+// osmotic-plugin-pause/index.js
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+module.exports = {
+	name: 'osmotic-plugin-pause',
+	commands: {
+		pause: (ms) => (ctx, next) => sleep(ms).then(() => next(ctx)),
+	},
+};
+```
+
+A plugin that takes options exports a function instead. `plugins()` calls a
+function entry without arguments, so give every option a default:
+
+```js
+module.exports = ({ ms = 500 } = {}) => ({
+	name: 'osmotic-plugin-pause',
+	commands: {
+		pause:
+			(wait = ms) =>
+			(ctx, next) =>
+				sleep(wait).then(() => next(ctx)),
+	},
+});
+
+// Both work:
+Osmotic.plugins([require('osmotic-plugin-pause')]);
+Osmotic.plugins([require('osmotic-plugin-pause')({ ms: 1000 })]);
+```
+
+A plugin never needs to load osmotic itself: commands get the instance as `this`, with
+helpers like `this.fetchPage(url)`, `this.links(ctx, spec)` and `this.opts`. ES
+modules can `export default` the plugin or the function; `plugins()` unwraps
+`default`.
+
+Conventions for publishing:
+
+- Name the package `osmotic-plugin-<name>` (or `@scope/osmotic-plugin-<name>`) and
+  add the keyword `osmotic-plugin`.
+- List osmotic as a peer dependency, e.g. `"peerDependencies": { "osmotic": "^2.1.0" }`,
+  rather than a regular dependency.
+- In TypeScript, type the plugin as `OsmoticPlugin` and declare its commands so
+  callers get them on `Osmotic`:
+
+```ts
+import type { OsmoticPlugin } from 'osmotic';
+
+declare module 'osmotic' {
+	interface Osmotic {
+		pause(ms?: number): this;
+	}
+}
+
+const plugin: OsmoticPlugin = {
+	name: 'osmotic-plugin-pause',
+	commands: {
+		pause:
+			(ms: number = 500) =>
+			(ctx, next) =>
+				sleep(ms).then(() => next(ctx)),
+	},
+};
+
+export default plugin;
+```
+
+A middleware's `onStart` and `onEnd` hooks run once per run of every chain that uses
+it, so a plugin that holds a resource, such as a browser, should share it between
+runs or count how many are active.
+
 ## TypeScript
 
 Type declarations are included for both entry points. Useful exported types
 include `Step`, `Context`, `Spec`, `OsmoticOptions`, `SlotConfig`, `FetchMiddleware`,
 `FetchRequest`, `CsvOptions`, `RecurseOptions`, `FilterTest`, `OsmoticEvents`,
-`RunStats` and `SkipReason`. The public API carries TSDoc comments, so editors show
+`RunStats`, `SkipReason`, `OsmoticPlugin` and `PluginInput`. The public API carries TSDoc comments, so editors show
 documentation on hover.
 
 ## Development
@@ -380,6 +487,7 @@ Code uses single quotes and tab indentation, set in `.prettierrc.json` and
 | File                              | Responsibility                                        |
 | --------------------------------- | ----------------------------------------------------- |
 | `src/osmotic.ts`                  | The `Osmotic` class: commands, page fetching, running |
+| `src/plugins.ts`                  | Plugin format, checks and loading                     |
 | `src/extract.ts`                  | Extraction specs and link collection                  |
 | `src/selectors.ts`                | Selector extras (`[n]`, `:text-is`, `:text-match`)    |
 | `src/urls.ts`                     | URL resolution and `<base href>` handling             |
