@@ -5,6 +5,78 @@
 - For every new feature, create a feature branch named `feature/branch-name`.
 - For every fix, create a fix branch named `fix/branch-name`.
 
+## Plan
+
+Every branch has a `PLAN.md` in the repository root, written before any code. Keep it up to date while working.
+
+```md
+# <Branch name>
+
+## Prompts
+
+Every prompt that shaped this branch, verbatim, in order. Append new ones as they arrive.
+
+## Interpretation
+
+What the prompts are understood to ask for, in your own words. Write it before any code, so a misreading is caught early.
+
+## Type
+
+Feature, Bugfix or Other (formatting, documentation, dependency updates and so on).
+
+## Breaking change
+
+Yes or no, and if yes, what breaks and how to migrate.
+
+## Version bump
+
+Major, minor, patch or none, following from the type and whether it breaks.
+
+## Scope
+
+What this branch does, and what it deliberately leaves out.
+
+## Acceptance criteria
+
+- [ ] Checkable statements. Each one is covered by an automated test, or says why it can't be.
+
+## Affected public API
+
+Commands, options, events and types that are added, changed or removed.
+
+## Impact on the rest of the codebase
+
+- Checked: what was searched or reviewed, such as callers of every changed function or type, modules
+  importing changed files, the run lifecycle and shared state, examples, docs, and plugins in sibling repos.
+- Found: every effect outside the intended change, or "None". "None" only counts with the list above filled in.
+
+## Decisions
+
+Questions that came up while working, and how they were answered.
+
+## Verification
+
+How each acceptance criterion was checked, and anything left unchecked.
+
+## Follow-ups
+
+Work this branch causes elsewhere, such as other repos, publish order, or docs.
+```
+
+For changes of type Other, the Prompts, Interpretation, Type and Version bump sections are enough.
+
+## Tests
+
+New features and bugfixes come with automated tests, written before the code:
+
+1. Write tests for the acceptance criteria in `PLAN.md`. A bugfix starts with a test that reproduces the bug.
+2. Run them and see them fail. A test that passes before the code exists doesn't test the change.
+3. Write the code until the tests pass.
+
+When a test fails against new code, fix the code, not the test. A test may only be changed after the code is written if the test itself is wrong: it has a bug, or it checks something the acceptance criteria don't require. In that case, record in the `Decisions` section of `PLAN.md` what was wrong with the test and why, before changing it. Changing a test to match what the code happens to do is never allowed.
+
+Commit the tests before the code, so the history shows they came first.
+
 ## Commits
 
 - Commit messages should be short and informative.
@@ -12,9 +84,12 @@
 
 ## Before merging to master
 
+- Every acceptance criterion in `PLAN.md` is ticked off, or the plan says why it was dropped.
+- `npm test` passes.
 - Bump the version in `package.json` according to [semantic versioning](https://semver.org/).
 - Update `CHANGELOG.md`.
 - Read `README.md` and determine whether an update is necessary.
+- Remove `PLAN.md` in a final commit. It stays in the branch's history, which the merge commit keeps reachable.
 
 ## After merging to master
 
