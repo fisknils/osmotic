@@ -25,7 +25,11 @@ export function pick($: CheerioAPI, node: PageNode, spec: Spec, base: string | n
 			throw new Error('Array specs take ["selector"] or ["selector", { key: spec }], e.g. ["img@src"]');
 		}
 		if (isFields) {
-			const targets = first ? $(node).find(first).toArray() : [node];
+			const [sel, attr] = splitSpec(first);
+			if (attr) {
+				throw new Error(`The selector of a list spec takes no @attr: "${first}"`);
+			}
+			const targets = sel ? $(node).find(sel).toArray() : [node];
 			return targets.map((el) => pick($, el, fields, base));
 		}
 		const [sel, attr] = splitSpec(first);
