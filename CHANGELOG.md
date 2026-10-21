@@ -4,6 +4,14 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows
 [Semantic Versioning](https://semver.org/).
 
+## [3.1.0] - 2026-10-21
+
+### Added
+
+- List specs `["selector", { key: spec }]` extract one object per match, each spec
+  resolved relative to it. Several of them in one `.set()` capture several groups of
+  repeated items, such as offers and specifications, from one page into one row.
+
 ## [3.0.0] - 2026-10-21
 
 ### Breaking changes
@@ -107,6 +115,7 @@ const { Osmotic } = require('osmotic');
 
 Last release as `@fisknils/osmo`.
 
+[3.1.0]: https://www.npmjs.com/package/osmotic/v/3.1.0
 [3.0.0]: https://www.npmjs.com/package/osmotic/v/3.0.0
 [2.1.0]: https://www.npmjs.com/package/osmotic/v/2.1.0
 [2.0.1]: https://www.npmjs.com/package/osmotic/v/2.0.1
