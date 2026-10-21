@@ -5,8 +5,7 @@
 	"keywords": [
 		"osmotic",
 		"scraper",
-		"crawler",
-		"headless"
+		"crawler"
 	],
 	"license": "ISC",
 	"author": {
