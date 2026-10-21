@@ -203,10 +203,10 @@ selector alias or a function `(element, argument) => boolean`:
 
 ```js
 .config({
-  pseudos: {
-    sale: '.badge-sale',
-    long: (el) => el.children.length > 10
-  }
+	pseudos: {
+		sale: '.badge-sale',
+		long: (el) => el.children.length > 10,
+	},
 })
 ```
 
@@ -227,7 +227,8 @@ selector alias or a function `(element, argument) => boolean`:
 | `pseudos`           | `{}`            | Custom selector pseudo-classes.                                  |
 
 Only HTML responses with a 2xx status continue the chain. Other responses and
-network errors end that branch; network errors are also logged.
+network errors end that branch; network errors are also logged, unless an
+[`error` handler](#events) is registered.
 
 ### Slots: proxies and per-request identities
 
@@ -237,10 +238,10 @@ to the global option:
 
 ```js
 .config({
-  slots: [
-    { proxy: "http://proxy1:8080", userAgent: "Agent A", delay: 500 },
-    { proxy: "http://proxy2:8080", headers: { "Accept-Language": "sv" } },
-  ],
+	slots: [
+		{ proxy: 'http://proxy1:8080', userAgent: 'Agent A', delay: 500 },
+		{ proxy: 'http://proxy2:8080', headers: { 'Accept-Language': 'sv' } },
+	],
 })
 ```
 
@@ -248,6 +249,37 @@ Proxies are handled by [undici](https://undici.nodejs.org/), which is loaded onl
 when a slot uses a proxy. If it isn't already installed, run `npm install undici`.
 
 `robots.txt` itself is always fetched directly, not through a slot.
+
+## Events
+
+`.on(event, handler)` listens for run events, and `.off(event, handler)` removes a
+handler again. Both return the instance, so they can go anywhere in the chain.
+
+| Event   | Payload                                                      | When                                 |
+| ------- | ------------------------------------------------------------ | ------------------------------------ |
+| `start` | `{ osmotic }`                                                | Before the first request.            |
+| `page`  | `{ url, requestedUrl, status, ms }`                          | A page was fetched and parsed.       |
+| `skip`  | `{ url, reason, status? }`                                   | A URL was not fetched or not parsed. |
+| `error` | `{ url, error }`                                             | A request failed.                    |
+| `end`   | `{ osmotic, stats: { pages, robotsSkipped, rows }, error? }` | After the run, also when it failed.  |
+
+- `start` handlers are awaited in order, and one that throws aborts the run.
+- `end` handlers are all awaited, even if some throw. `stats.rows` maps each CSV
+  path to the number of rows written, and `error` is set when the run failed.
+- `page`, `skip` and `error` handlers are not awaited, so a slow handler never holds
+  up the crawl. A handler that throws is logged and doesn't affect the run.
+- `reason` is `robots`, `maxPages`, `status` (not 2xx) or `contentType` (not HTML).
+  Links back to pages already visited are not reported.
+- Registering an `error` handler replaces the default console output for failed
+  requests.
+
+```js
+Osmotic.get('https://example.com')
+	.on('skip', ({ url, reason }) => console.log(`skipped ${url} (${reason})`))
+	.on('end', ({ stats }) => console.log(stats))
+	.recurse()
+	.run();
+```
 
 ## Extending osmotic
 
@@ -293,6 +325,10 @@ const retry =
 Osmotic.get('https://example.com').useFetch(retry(2)) /* ... */;
 ```
 
+A middleware can carry `onStart` and `onEnd` functions. `useFetch()` registers them
+as [`start` and `end` handlers](#events), so a middleware can set up and clean up
+after itself.
+
 ### Reusable commands: `Osmotic.command(name, factory)`
 
 Registers a chainable method on every `Osmotic` instance. `factory(...args)` returns
@@ -325,14 +361,21 @@ registered through one is available through the other.
 
 Type declarations are included for both entry points. Useful exported types
 include `Step`, `Context`, `Spec`, `OsmoticOptions`, `SlotConfig`, `FetchMiddleware`,
-`FetchRequest`, `CsvOptions`, `RecurseOptions` and `FilterTest`.
+`FetchRequest`, `CsvOptions`, `RecurseOptions`, `FilterTest`, `OsmoticEvents`,
+`RunStats` and `SkipReason`. The public API carries TSDoc comments, so editors show
+documentation on hover.
 
 ## Development
 
 ```sh
-npm run build   # clean dist/ and compile src/ with tsc
-npm run clean   # remove dist/
+npm run build          # clean dist/ and compile src/ with tsc
+npm run clean          # remove dist/
+npm run format         # format everything with Prettier
+npm run format:check   # check formatting without writing
 ```
+
+Code uses single quotes and tab indentation, set in `.prettierrc.json` and
+`.editorconfig`.
 
 | File                              | Responsibility                                        |
 | --------------------------------- | ----------------------------------------------------- |
@@ -340,6 +383,7 @@ npm run clean   # remove dist/
 | `src/extract.ts`                  | Extraction specs and link collection                  |
 | `src/selectors.ts`                | Selector extras (`[n]`, `:text-is`, `:text-match`)    |
 | `src/urls.ts`                     | URL resolution and `<base href>` handling             |
+| `src/events.ts`                   | Run events and their typed emitter                    |
 | `src/csv.ts`                      | Streaming CSV writer                                  |
 | `src/robots.ts`                   | `robots.txt` cache and `Crawl-delay` scheduling       |
 | `src/slots.ts`                    | Request slot pool                                     |
