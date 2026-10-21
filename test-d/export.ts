@@ -1,6 +1,6 @@
 import { Osmotic, type ExportOptions } from '../src/index.cjs';
 
-declare module '../src/exporters.js' {
+declare module '../src/types/exporters.js' {
 	interface ExportTypes {
 		'type-test-declared': { pretty?: boolean };
 	}

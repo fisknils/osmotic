@@ -1,5 +1,6 @@
 import type { Dispatcher } from 'undici';
-import type { FetchMiddleware, FetchRequest, Slot } from './types.js';
+import type { FetchMiddleware, FetchRequest } from '../types/fetch.js';
+import type { Slot } from '../types/options.js';
 
 // Proxy agent per slot, created on the slot's first request
 const dispatchers = new WeakMap<Slot, Dispatcher>();

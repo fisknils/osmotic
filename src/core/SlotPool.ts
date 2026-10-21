@@ -1,4 +1,4 @@
-import type { Slot } from './types.js';
+import type { Slot } from '../types/options.js';
 
 // Fixed set of request slots. Waiters with a higher priority are served first,
 // equal priorities first come, first served.
