@@ -61,6 +61,15 @@ test('loading is all or nothing', () => {
 	assert.equal(typeof new Osmotic().pluginTestGood, 'function', 'the good plugin can still be loaded');
 });
 
+test('a plugin command named after a public property is rejected', () => {
+	const before: OsmoticPlugin = { name: 'plugin-test-before-opts', commands: { pluginTestBeforeOpts: shout('x') } };
+	const clash: OsmoticPlugin = { name: 'plugin-test-opts', commands: { opts: shout('x') } };
+	assert.throws(() => Osmotic.plugins([before, clash]), /Plugin "plugin-test-opts": command "opts" already exists/);
+	const chain = new Osmotic() as unknown as Record<string, unknown>;
+	assert.equal(typeof chain.pluginTestBeforeOpts, 'undefined', 'nothing in the list is loaded');
+	assert.equal(typeof chain.opts, 'object', 'opts is still the options');
+});
+
 test('invalid plugins are rejected', () => {
 	const bad = (value: unknown) => () => Osmotic.plugins([value as OsmoticPlugin]);
 	assert.throws(bad(42), /Not an osmotic plugin/);

@@ -8,6 +8,12 @@ declare module '../src/core/Osmotic.js' {
 		extendTestPause(ms: number): this;
 		extendTestFirstLink(): this;
 		host(): this;
+		steps(): this;
+		exports(): this;
+		fetchMiddleware(): this;
+		events(): this;
+		state(): this;
+		pluginFetch(): this;
 	}
 }
 
@@ -104,8 +110,23 @@ test('a command named host can be registered and called', async (t) => {
 	assert.deepEqual(rows, [{ host: new URL(site.url('/')).host }]);
 });
 
+test('commands can be named after the internal state of a chain', async (t) => {
+	const site = await openSite(t, shop);
+	const names = ['steps', 'exports', 'fetchMiddleware', 'events', 'state', 'pluginFetch'] as const;
+	for (const name of names) {
+		Osmotic.command(name, () => (ctx, next) => next({ ...ctx, data: { ...ctx.data, [name]: true } }));
+	}
+	const chain = Osmotic.get(site.url('/')).steps().exports().fetchMiddleware().events().state().pluginFetch();
+	const { rows } = await scrape(chain);
+	assert.deepEqual(rows, [Object.fromEntries(names.map((name) => [name, true]))]);
+});
+
 test('a command name that already exists is rejected', () => {
 	assert.throws(() => Osmotic.command('find', () => (ctx, next) => next(ctx)), /already exists/);
+});
+
+test('a command named after a public property is rejected', () => {
+	assert.throws(() => Osmotic.command('opts', () => (ctx, next) => next(ctx)), /command "opts" already exists/);
 });
 
 test('fetchPage() only works during a run, and returns null for a URL already seen', async (t) => {
