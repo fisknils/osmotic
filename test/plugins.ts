@@ -70,10 +70,64 @@ test('invalid plugins are rejected', () => {
 	assert.throws(() => Osmotic.plugins({} as unknown as OsmoticPlugin[]), /expects an array/);
 });
 
-// Known bug: an array passes the object check, so [fn] would register a command named "0"
-test('commands given as an array are rejected', { todo: 'fix in a fix/ branch' }, () => {
+test('commands given as an array are rejected', () => {
 	assert.throws(
 		() => Osmotic.plugins([{ name: 'plugin-test-array', commands: [shout('x')] } as unknown as OsmoticPlugin]),
 		/commands must be an object/,
+	);
+});
+
+const memoryExporter = () => ({ write: () => {}, end: () => {} });
+
+test('a plugin adds export types through exporters', async (t) => {
+	const site = await openSite(t, shop);
+	const files: string[] = [];
+	Osmotic.plugins([
+		{
+			name: 'plugin-test-exporters',
+			exporters: {
+				'plugin-test-memory': (file) => {
+					files.push(file);
+					return memoryExporter();
+				},
+			},
+		},
+	]);
+	await Osmotic.get(site.url('/')).export('plugin-test-memory', 'home.out').run();
+	assert.deepEqual(files, ['home.out']);
+});
+
+test('an export type that is taken throws and loads nothing from the list', () => {
+	Osmotic.exporter('plugin-test-taken-type', memoryExporter);
+	const good: OsmoticPlugin = {
+		name: 'plugin-test-good-type',
+		exporters: { 'plugin-test-fresh-type': memoryExporter },
+	};
+	const clash: OsmoticPlugin = {
+		name: 'plugin-test-type-clash',
+		exporters: { 'plugin-test-taken-type': memoryExporter },
+	};
+	assert.throws(() => Osmotic.plugins([good, clash]), /exporter "plugin-test-taken-type" already exists/);
+	assert.throws(() => new Osmotic().export('plugin-test-fresh-type', 'x'), /No exporter/);
+	const twins: OsmoticPlugin[] = [
+		{ name: 'plugin-test-twin-a', exporters: { 'plugin-test-twin-type': memoryExporter } },
+		{ name: 'plugin-test-twin-b', exporters: { 'plugin-test-twin-type': memoryExporter } },
+	];
+	assert.throws(() => Osmotic.plugins(twins), /exporter "plugin-test-twin-type" already exists/);
+});
+
+test('exporters that is not an object of functions is rejected', () => {
+	const bad = (value: unknown) => () => Osmotic.plugins([value as OsmoticPlugin]);
+	assert.throws(bad({ name: 'p4', exporters: 'csv' }), /exporters must be an object/);
+	assert.throws(bad({ name: 'p5', exporters: { csv: 'no' } }), /exporter "csv" must be a function/);
+});
+
+test('exporters given as an array are rejected', () => {
+	assert.throws(
+		() =>
+			Osmotic.plugins([
+				{ name: 'plugin-test-array-exporters', exporters: [memoryExporter] } as unknown as OsmoticPlugin,
+			]),
+		/exporters must be an object/,
 	);
 });
