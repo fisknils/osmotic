@@ -1,9 +1,9 @@
 import type { SitePage } from '../create-site.js';
 
-// A small web shop: categories with pagination, product pages, and the links a real
-// shop has besides: nofollow, mailto:, javascript:, fragments, another host, a PDF,
-// a dead link, a redirect from an old URL, and a robots.txt that keeps crawlers out
-// of /admin/ and /cart.
+// A small web shop: categories with pagination, product pages with other sellers'
+// offers, and the links a real shop has besides: nofollow, mailto:, javascript:,
+// fragments, another host, a PDF, a dead link, a redirect from an old URL, and a
+// robots.txt that keeps crawlers out of /admin/ and /cart.
 
 interface Product {
 	slug: string;
@@ -12,12 +12,47 @@ interface Product {
 	tags: string[];
 	power: string;
 	sale?: boolean;
+	offers: Offer[];
+}
+
+// Another seller's offer for the same product, as on a price comparison site
+interface Offer {
+	seller: string;
+	logo: string;
+	price: number;
+	shipping: { method: string; cost: number }[];
 }
 
 export const products: Product[] = [
-	{ slug: 'desk-lamp', name: 'Desk lamp', price: 499, tags: ['LED', 'Dimmable'], power: '9 W', sale: true },
-	{ slug: 'floor-lamp', name: 'Floor lamp', price: 1299, tags: ['LED'], power: '24 W' },
-	{ slug: 'usb-charger', name: 'USB charger', price: 199, tags: [], power: '65 W' },
+	{
+		slug: 'desk-lamp',
+		name: 'Desk lamp',
+		price: 499,
+		tags: ['LED', 'Dimmable'],
+		power: '9 W',
+		sale: true,
+		offers: [
+			{
+				seller: 'Lampbutiken',
+				logo: 'lampbutiken',
+				price: 479,
+				shipping: [
+					{ method: 'Post', cost: 49 },
+					{ method: 'Pickup', cost: 0 },
+				],
+			},
+			{ seller: 'Ljus & Co', logo: 'ljus-co', price: 495, shipping: [{ method: 'Post', cost: 0 }] },
+		],
+	},
+	{
+		slug: 'floor-lamp',
+		name: 'Floor lamp',
+		price: 1299,
+		tags: ['LED'],
+		power: '24 W',
+		offers: [{ seller: 'Lampbutiken', logo: 'lampbutiken', price: 1249, shipping: [{ method: 'Truck', cost: 199 }] }],
+	},
+	{ slug: 'usb-charger', name: 'USB charger', price: 199, tags: [], power: '65 W', offers: [] },
 ];
 
 const bySlug = (slug: string) => products.find((p) => p.slug === slug)!;
@@ -28,6 +63,18 @@ const listItem = (p: Product) => `
 		<span class="price">${p.price} kr</span>
 		${p.sale ? '<span class="badge-sale">Sale</span>' : ''}
 	</li>`;
+
+// Offers use their own class names and have no links, so selectors for the shop's own
+// price, tags and links don't pick them up.
+const offerItem = (o: Offer) => `
+		<div class="offer">
+			<img class="seller-logo" src="/img/sellers/${o.logo}.png" alt="">
+			<span class="seller">${o.seller}</span>
+			<span class="offer-price">${o.price} SEK</span>
+			<ul class="shipping">${o.shipping
+				.map((s) => `<li><span class="method">${s.method}</span> <span class="cost">${s.cost}</span></li>`)
+				.join('')}</ul>
+		</div>`;
 
 const productPage = (p: Product) => `<!doctype html>
 <html>
@@ -44,6 +91,7 @@ const productPage = (p: Product) => `<!doctype html>
 		<tr><td>Power</td><td>${p.power}</td></tr>
 		<tr><td>Colour</td><td>Black</td></tr>
 	</table>
+	<section class="offers">${p.offers.map(offerItem).join('')}</section>
 	<img class="photo" src="/img/${p.slug}.jpg" srcset="/img/${p.slug}.jpg 1x, /img/${p.slug}@2x.jpg 2x" alt="${p.name}">
 	<a class="manual" href="/manuals/${p.slug}.pdf">Manual</a>
 	<a class="back" href="/">Home</a>

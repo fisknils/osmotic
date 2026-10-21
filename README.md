@@ -185,15 +185,30 @@ to the console.
 
 Specs are used by `set()`, and the string form by `follow()` and `recurse()`.
 
-| Spec                 | Result                                                             |
-| -------------------- | ------------------------------------------------------------------ |
-| `"selector"`         | Trimmed text of the first match                                    |
-| `"selector@attr"`    | Attribute of the first match                                       |
-| `"@attr"`            | Attribute of the current node itself                               |
-| `""`                 | Text of the current node itself                                    |
-| `["selector"]`       | Array of the text of every match                                   |
-| `["selector@attr"]`  | Array of the attribute of every match (missing attributes skipped) |
-| `{ key: spec, ... }` | Nested object, each spec resolved relative to the node             |
+| Spec                               | Result                                                             |
+| ---------------------------------- | ------------------------------------------------------------------ |
+| `"selector"`                       | Trimmed text of the first match                                    |
+| `"selector@attr"`                  | Attribute of the first match                                       |
+| `"@attr"`                          | Attribute of the current node itself                               |
+| `""`                               | Text of the current node itself                                    |
+| `["selector"]`                     | Array of the text of every match                                   |
+| `["selector@attr"]`                | Array of the attribute of every match (missing attributes skipped) |
+| `["selector", { key: spec, ... }]` | Array of objects, one per match, each spec resolved relative to it |
+| `{ key: spec, ... }`               | Nested object, each spec resolved relative to the node             |
+
+The list form captures several groups of repeated items from one page into one row,
+where `find()` could only split the chain on one of them:
+
+```js
+.set({
+	name: 'h1',
+	offers: ['#offers .offer', { seller: '.seller', price: '.price' }],
+	specs: ['#specs tr', { label: 'td[1]', value: 'td[2]' }],
+})
+// { name: 'Desk lamp', offers: [{ seller: 'Lampbutiken', price: '479 SEK' }, ...], specs: [...] }
+```
+
+The specs inside the object can take any form, including another list.
 
 With `resolveUrls` on (the default), URL attributes come back absolute:
 `href`, `src`, `action`, `formaction`, `poster`, `cite`, `background`, `longdesc`

@@ -13,14 +13,22 @@ const detach = (v: string | undefined): string | undefined =>
 //   "selector"        text of the first match
 //   "selector@attr"   attribute of the first match ("@attr" = the node itself)
 //   ["selector@attr"] list of values from all matches
+//   ["selector", { key: spec }]
+//                     list of objects, one per match, each spec resolved relative to it
 //   { key: spec }     nested object, each spec resolved relative to node
 // When base is given, URL attributes are resolved to absolute URLs against it.
 export function pick($: CheerioAPI, node: PageNode, spec: Spec, base: string | null = null): Extracted {
 	if (Array.isArray(spec)) {
-		if (spec.length !== 1 || typeof spec[0] !== 'string') {
-			throw new Error('Array specs take a single selector string, e.g. ["img@src"]');
+		const [first, fields] = spec;
+		const isFields = fields !== null && typeof fields === 'object' && !Array.isArray(fields);
+		if (typeof first !== 'string' || (spec.length === 2 ? !isFields : spec.length !== 1)) {
+			throw new Error('Array specs take ["selector"] or ["selector", { key: spec }], e.g. ["img@src"]');
 		}
-		const [sel, attr] = splitSpec(spec[0]);
+		if (isFields) {
+			const targets = first ? $(node).find(first).toArray() : [node];
+			return targets.map((el) => pick($, el, fields, base));
+		}
+		const [sel, attr] = splitSpec(first);
 		const targets = sel ? $(node).find(sel).toArray() : [node];
 		return targets
 			.map((el) => (attr ? resolveAttr(attr, detach($(el).attr(attr)), base) : $(el).text().trim()))

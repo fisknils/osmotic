@@ -77,8 +77,101 @@ test('a later .set() merges into the data and overrides earlier keys', async (t)
 	assert.deepEqual(rows, [{ name: 'Desk lamp', price: '499' }]);
 });
 
-test('an array spec with more than one selector fails the run', async (t) => {
+test('[selector, fields] gives one object per match, resolved relative to it', async (t) => {
 	const site = await openSite(t, shop);
-	const chain = Osmotic.get(site.url('/product/desk-lamp')).set({ both: ['h1', '.tag'] as unknown as string[] });
-	await assert.rejects(chain.run(), /Array specs take a single selector string/);
+	const chain = Osmotic.get(site.url('/product/floor-lamp')).set({
+		offers: ['.offer', { seller: '.seller', price: '.offer-price' }],
+	});
+	const { rows } = await scrape(chain);
+	assert.deepEqual(rows, [{ offers: [{ seller: 'Lampbutiken', price: '1249 SEK' }] }]);
 });
+
+test('several list specs capture several groups from one page into one row', async (t) => {
+	const site = await openSite(t, shop);
+	const chain = Osmotic.get(site.url('/product/desk-lamp')).set({
+		name: 'h1',
+		offers: ['.offer', { seller: '.seller', price: '.offer-price' }],
+		specs: ['.specs tr', { label: 'td[1]', value: 'td[2]' }],
+	});
+	const { rows, page } = await scrape(chain);
+	assert.deepEqual(rows, [
+		{
+			name: 'Desk lamp',
+			offers: [
+				{ seller: 'Lampbutiken', price: '479 SEK' },
+				{ seller: 'Ljus & Co', price: '495 SEK' },
+			],
+			specs: [
+				{ label: 'Power', value: '9 W' },
+				{ label: 'Colour', value: 'Black' },
+			],
+		},
+	]);
+	assert.equal(page.length, 1);
+});
+
+test('the fields of a list spec take every spec form', async (t) => {
+	const site = await openSite(t, shop);
+	const chain = Osmotic.get(site.url('/product/desk-lamp')).set({
+		offers: [
+			'.offer',
+			{
+				seller: '.seller',
+				logo: '.seller-logo@src',
+				methods: ['.method'],
+				shipping: ['.shipping li', { method: '.method', cost: '.cost' }],
+				all: { seller: '.seller', price: '.offer-price' },
+				missing: '.nothing@href',
+			},
+		],
+	});
+	const { rows } = await scrape(chain);
+	assert.deepEqual(rows, [
+		{
+			offers: [
+				{
+					seller: 'Lampbutiken',
+					logo: site.url('/img/sellers/lampbutiken.png'),
+					methods: ['Post', 'Pickup'],
+					shipping: [
+						{ method: 'Post', cost: '49' },
+						{ method: 'Pickup', cost: '0' },
+					],
+					all: { seller: 'Lampbutiken', price: '479 SEK' },
+					missing: undefined,
+				},
+				{
+					seller: 'Ljus & Co',
+					logo: site.url('/img/sellers/ljus-co.png'),
+					methods: ['Post'],
+					shipping: [{ method: 'Post', cost: '0' }],
+					all: { seller: 'Ljus & Co', price: '495 SEK' },
+					missing: undefined,
+				},
+			],
+		},
+	]);
+});
+
+test('a list spec without matches gives an empty array', async (t) => {
+	const site = await openSite(t, shop);
+	const chain = Osmotic.get(site.url('/product/usb-charger')).set({
+		offers: ['.offer', { seller: '.seller' }],
+	});
+	const { rows } = await scrape(chain);
+	assert.deepEqual(rows, [{ offers: [] }]);
+});
+
+for (const [name, spec] of [
+	['more than one selector', ['h1', '.tag']],
+	['a selector and a list', ['.offer', ['.seller']]],
+	['a field object first', [{ seller: '.seller' }, '.offer']],
+	['three elements', ['.offer', { seller: '.seller' }, { price: '.offer-price' }]],
+	['nothing', []],
+] as const) {
+	test(`an array spec with ${name} fails the run`, async (t) => {
+		const site = await openSite(t, shop);
+		const chain = Osmotic.get(site.url('/product/desk-lamp')).set({ bad: spec as unknown as string[] });
+		await assert.rejects(chain.run(), /Array specs take \["selector"\] or \["selector", \{ key: spec \}\]/);
+	});
+}
