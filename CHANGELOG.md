@@ -4,6 +4,18 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows
 [Semantic Versioning](https://semver.org/).
 
+## [3.1.1] - 2026-10-22
+
+### Fixed
+
+- A command registered with `Osmotic.command()` or a plugin under the name of one of
+  the chain's internal fields, such as `steps`, `state` or `events`, registered without
+  an error but couldn't be called. These names work as commands now. The internal
+  fields, which were never part of the API, are no longer reachable as properties, so
+  JavaScript code that read `chain.steps` and the like gets `undefined` now.
+- A command named `opts` now throws "already exists" when it's registered, like a
+  command named after a method. Before, it registered but couldn't be called.
+
 ## [3.1.0] - 2026-10-21
 
 ### Added
@@ -117,6 +129,7 @@ const { Osmotic } = require('osmotic');
 
 Last release as `@fisknils/osmo`.
 
+[3.1.1]: https://www.npmjs.com/package/osmotic/v/3.1.1
 [3.1.0]: https://www.npmjs.com/package/osmotic/v/3.1.0
 [3.0.0]: https://www.npmjs.com/package/osmotic/v/3.0.0
 [2.1.0]: https://www.npmjs.com/package/osmotic/v/2.1.0

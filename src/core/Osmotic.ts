@@ -69,21 +69,21 @@ export class Osmotic {
 		resolveUrls: true,
 	};
 
-	private readonly steps: Step[] = [];
-	private readonly exports: ExportTarget[] = [];
-	private readonly fetchMiddleware: FetchMiddleware[] = [];
-	private readonly events = new Emitter();
-	private state: RunState | null = null;
+	readonly #steps: Step[] = [];
+	readonly #exports: ExportTarget[] = [];
+	readonly #fetchMiddleware: FetchMiddleware[] = [];
+	readonly #events = new Emitter();
+	#state: RunState | null = null;
 	// Middleware from plugins loaded before this chain was created; runs after fetchMiddleware
-	private readonly pluginFetch: FetchMiddleware[] = [...pluginMiddleware];
+	readonly #pluginFetch: FetchMiddleware[] = [...pluginMiddleware];
 	// What the built-in commands in src/commands/ reach of this instance. An ES private field
 	// isn't a property, so it can't hide a command a plugin registers as `host` (see #16)
 	readonly #host: CommandHost = {
 		opts: this.opts,
-		priority: () => this.steps.length,
+		priority: () => this.#steps.length,
 		visit: (url, from, next, priority) => this.visit(url, from, next, priority),
 		links: (ctx, spec) => this.links(ctx, spec),
-		addExport: (target) => void this.exports.push(target),
+		addExport: (target) => void this.#exports.push(target),
 	};
 
 	/**
@@ -97,7 +97,7 @@ export class Osmotic {
 	 * ```
 	 */
 	constructor() {
-		for (const mw of this.pluginFetch) this.addHooks(mw);
+		for (const mw of this.#pluginFetch) this.addHooks(mw);
 	}
 
 	/**
@@ -145,7 +145,7 @@ export class Osmotic {
 	 * ```
 	 */
 	add(step: Step): this {
-		this.steps.push(step);
+		this.#steps.push(step);
 		return this;
 	}
 
@@ -186,7 +186,7 @@ export class Osmotic {
 	 * ```
 	 */
 	useFetch(mw: FetchMiddleware): this {
-		this.fetchMiddleware.push(mw);
+		this.#fetchMiddleware.push(mw);
 		this.addHooks(mw);
 		return this;
 	}
@@ -214,7 +214,7 @@ export class Osmotic {
 	 * ```
 	 */
 	on<E extends OsmoticEvent>(event: E, handler: Handler<E>): this {
-		this.events.on(event, handler);
+		this.#events.on(event, handler);
 		return this;
 	}
 
@@ -233,7 +233,7 @@ export class Osmotic {
 	 * ```
 	 */
 	off<E extends OsmoticEvent>(event: E, handler: Handler<E>): this {
-		this.events.off(event, handler);
+		this.#events.off(event, handler);
 		return this;
 	}
 
@@ -244,7 +244,8 @@ export class Osmotic {
 	 * @param name - The method name.
 	 * @param factory - Returns the step for the given arguments. Called with `this`
 	 * bound to the instance.
-	 * @throws If a method called `name` already exists.
+	 * @throws If a method or public property called `name` already exists, such as `find`
+	 * or `opts`.
 	 *
 	 * @example
 	 * ```ts
@@ -259,7 +260,7 @@ export class Osmotic {
 	 * ```
 	 */
 	static command<A extends unknown[]>(name: string, factory: (this: Osmotic, ...args: A) => Step): void {
-		if (name in Osmotic.prototype) throw new Error(`Osmotic command "${name}" already exists`);
+		if (Osmotic.isTaken(name)) throw new Error(`Osmotic command "${name}" already exists`);
 		(Osmotic.prototype as unknown as Record<string, unknown>)[name] = function (this: Osmotic, ...args: A) {
 			return this.add(factory.apply(this, args));
 		};
@@ -311,10 +312,16 @@ export class Osmotic {
 	 */
 	static plugins(list: PluginInput[]): typeof Osmotic {
 		loadPlugins(list, {
-			hasCommand: (name) => name in Osmotic.prototype,
+			hasCommand: (name) => Osmotic.isTaken(name),
 			addCommand: (name, factory) => Osmotic.command(name, factory),
 		});
 		return Osmotic;
+	}
+
+	// Whether a command can't be called `name`: a method has it, or an instance's own
+	// property does, which would hide the command on every instance (such as opts)
+	private static isTaken(name: string): boolean {
+		return name in Osmotic.prototype || Object.hasOwn(new Osmotic(), name);
 	}
 
 	// --- Commands -------------------------------------------------------------
@@ -569,10 +576,10 @@ export class Osmotic {
 			});
 			run.pages++;
 			const finalUrl = res.url || url; // Constructed Responses (e.g. from middleware) have no url
-			this.events.emit('page', { url: finalUrl, requestedUrl: url, status: res.status, ms: Date.now() - started });
+			this.#events.emit('page', { url: finalUrl, requestedUrl: url, status: res.status, ms: Date.now() - started });
 			return { $, node: $.root(), url: finalUrl, base: pageBase($, finalUrl) };
 		} catch (error) {
-			if (this.events.has('error')) this.events.emit('error', { url, error });
+			if (this.#events.has('error')) this.#events.emit('error', { url, error });
 			else console.error(`Failed ${url}: ${error instanceof Error ? error.message : error}`);
 			return null;
 		} finally {
@@ -608,23 +615,23 @@ export class Osmotic {
 			pages: 0,
 			robotsSkipped: 0,
 		};
-		this.state = run;
-		for (const target of this.exports) target.reset();
+		this.#state = run;
+		for (const target of this.#exports) target.reset();
 		let failed = false;
 		let failure: unknown;
 		// A step that throws synchronously rejects only its own branch, as an async step would
 		const runFrom =
 			(i: number): Next =>
 			(ctx) => {
-				if (i >= this.steps.length) return Promise.resolve();
+				if (i >= this.#steps.length) return Promise.resolve();
 				try {
-					return this.steps[i](ctx, runFrom(i + 1));
+					return this.#steps[i](ctx, runFrom(i + 1));
 				} catch (err) {
 					return Promise.reject(err);
 				}
 			};
 		try {
-			await this.events.emitSerial('start', { osmotic: this });
+			await this.#events.emitSerial('start', { osmotic: this });
 			await runFrom(0)({ data: {} });
 		} catch (err) {
 			failed = true;
@@ -638,10 +645,10 @@ export class Osmotic {
 		const stats: RunStats = {
 			pages: run.pages,
 			robotsSkipped: run.robotsSkipped,
-			rows: Object.fromEntries(this.exports.map((t) => [t.file, t.rowCount])),
+			rows: Object.fromEntries(this.#exports.map((t) => [t.file, t.rowCount])),
 		};
-		await this.events.emitSettled('end', { osmotic: this, stats, ...(failed ? { error: failure } : {}) });
-		this.state = null;
+		await this.#events.emitSettled('end', { osmotic: this, stats, ...(failed ? { error: failure } : {}) });
+		this.#state = null;
 		if (failed) throw failure;
 		console.log(`Done. Fetched ${run.pages} page(s).`);
 		if (run.robotsSkipped) console.log(`Skipped ${run.robotsSkipped} URL(s) disallowed by robots.txt.`);
@@ -657,13 +664,13 @@ export class Osmotic {
 	}
 
 	private skip(url: string, reason: SkipReason, status?: number): null {
-		this.events.emit('skip', status === undefined ? { url, reason } : { url, reason, status });
+		this.#events.emit('skip', status === undefined ? { url, reason } : { url, reason, status });
 		return null;
 	}
 
 	private runState(): RunState {
-		if (!this.state) throw new Error('Pages can only be fetched while run() is in progress');
-		return this.state;
+		if (!this.#state) throw new Error('Pages can only be fetched while run() is in progress');
+		return this.#state;
 	}
 
 	// Fetch through the slot's settings, falling back to the global options
@@ -677,7 +684,7 @@ export class Osmotic {
 				...slot.headers,
 			},
 		};
-		return fetchThrough([...this.fetchMiddleware, ...this.pluginFetch], req);
+		return fetchThrough([...this.#fetchMiddleware, ...this.#pluginFetch], req);
 	}
 
 	// Register a middleware's own onStart/onEnd hooks as start/end handlers
@@ -688,8 +695,8 @@ export class Osmotic {
 
 	// Close every export, even if some fail, and return the errors
 	private async closeExports(): Promise<unknown[]> {
-		const results = await Promise.allSettled(this.exports.map((t) => t.end()));
-		for (const t of this.exports) console.log(t.summary());
+		const results = await Promise.allSettled(this.#exports.map((t) => t.end()));
+		for (const t of this.#exports) console.log(t.summary());
 		return results.flatMap((r) => (r.status === 'rejected' ? [r.reason] : []));
 	}
 }
