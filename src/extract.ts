@@ -14,7 +14,8 @@ const detach = (v: string | undefined): string | undefined =>
 //   "selector@attr"   attribute of the first match ("@attr" = the node itself)
 //   ["selector@attr"] list of values from all matches
 //   ["selector", { key: spec }]
-//                     list of objects, one per match, each spec resolved relative to it
+//                     list of objects, one per match, each spec resolved relative to it;
+//                     the selector takes no @attr
 //   { key: spec }     nested object, each spec resolved relative to node
 // When base is given, URL attributes are resolved to absolute URLs against it.
 export function pick($: CheerioAPI, node: PageNode, spec: Spec, base: string | null = null): Extracted {
