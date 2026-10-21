@@ -11,6 +11,8 @@ All notable changes to this project are documented here. The format is based on
 - List specs `["selector", { key: spec }]` extract one object per match, each spec
   resolved relative to it. Several of them in one `.set()` capture several groups of
   repeated items, such as offers and specifications, from one page into one row.
+  The list's selector takes the [selector extras](README.md#selector-extras), but no
+  `@attr`.
 
 ## [3.0.0] - 2026-10-21
 

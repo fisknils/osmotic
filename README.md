@@ -208,7 +208,9 @@ where `find()` could only split the chain on one of them:
 // { name: 'Desk lamp', offers: [{ seller: 'Lampbutiken', price: '479 SEK' }, ...], specs: [...] }
 ```
 
-The specs inside the object can take any form, including another list.
+The specs inside the object can take any form, including another list. The list's own
+selector takes the [selector extras](#selector-extras), but no `@attr`, since each match
+is the node its specs resolve against.
 
 With `resolveUrls` on (the default), URL attributes come back absolute:
 `href`, `src`, `action`, `formaction`, `poster`, `cite`, `background`, `longdesc`
