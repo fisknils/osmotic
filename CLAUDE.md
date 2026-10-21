@@ -166,6 +166,7 @@ src/
   index.cts          CommonJS entry point: assembles and exports the public API
   index.mts          ESM entry point: re-exports the CommonJS build
   core/              the Osmotic class and the machinery it runs on
+  commands/          the built-in chain commands, one file per command
   types/             public types, one file per concern
   errors/            custom error classes, one class per file
   utils/             small, self-contained helpers, one concern per file
@@ -176,6 +177,7 @@ dist/                build output (not committed)
 ```
 
 - `core/`: stateful classes and run logic. A file that defines a class is named after it in PascalCase (`Osmotic.ts`, `SlotPool.ts`, `RobotsCache.ts`); other files are kebab-case (`plugins.ts`, `constants.ts`).
+- `commands/`: one kebab-case file per built-in chain command, named after it (`get.ts`, `recurse.ts`, `export.ts`). Each exports a function that builds the command's step. The `Osmotic` class keeps a method per command, with its TSDoc, that calls this function, so the public types stay on the class. Commands reach the class's private parts only through `CommandHost` in `core/command-host.ts`.
 - `types/`: only types and interfaces, no runtime code. Split by concern (`options.ts`, `context.ts`, `fetch.ts`, `events.ts`, `exporters.ts`, `plugins.ts`). Everything public is re-exported from the entry points.
 - `errors/`: every custom error class gets its own file named after the class (`OsmoticError.ts`). Add the folder with the first one; until then, plain `Error` is fine.
 - `utils/`: pure functions that don't import from `core/`, in kebab-case files named after what they do (`delay.ts`, `normalize-selector.ts`, `resolve-url.ts`).
