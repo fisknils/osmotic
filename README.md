@@ -1,0 +1,352 @@
+# osmotic
+
+A small, chainable web scraper for Node.js. Describe a crawl as a chain of steps
+(load a page, find elements, extract fields, follow links, and so on), then
+`run()` it. Pages are parsed with [cheerio](https://cheerio.js.org/), so selectors
+are plain CSS with a few additions.
+
+Inspired by [node-osmosis](https://github.com/rchipka/node-osmosis).
+
+```js
+const { Osmotic } = require("osmotic");
+
+Osmotic.get('https://news.ycombinator.com')
+  .recurse('a[rel="next"]@href')
+  .find('tr.athing')
+  .set({ rank: '.rank', title: '.titleline > a', link: '.titleline > a@href' })
+  .csv('hacker-news.csv')
+  .config({maxPages: 20})
+  .run();
+```
+
+- Fluent chain API, with branching built in: `find()` and `follow()` continue once per match
+- Extraction specs for text, attributes, lists and nested objects; URLs come back absolute
+- Respects `robots.txt` and `Crawl-delay` by default
+- Concurrency limits, per-request delays, and per-slot proxies, user agents and headers
+- CSV output streamed to disk, Excel-friendly by default
+- Extensible through custom steps, fetch middleware and reusable commands
+- Written in TypeScript; ships ESM and CommonJS entry points with type declarations
+
+Requires Node.js 18 or later (it uses the built-in `fetch`).
+
+## Installation
+
+```sh
+npm install osmotic
+```
+
+`npm install` also runs the build through the `prepare` script. The compiled
+package lives in `dist/`.
+
+```js
+// CommonJS
+const { Osmotic } = require('osmotic');
+
+// ES modules / TypeScript
+import { Osmotic } from 'osmotic';
+```
+
+## How a chain works
+
+Each command adds a step. When you call `run()`, a context object flows through the
+steps in order:
+
+| Field  | Meaning                                                  |
+| ------ | -------------------------------------------------------- |
+| `data` | Fields collected so far (starts as `{}`)                 |
+| `$`    | The cheerio instance for the current page                |
+| `node` | The current element (the document root right after a page loads) |
+| `url`  | The current page URL (after redirects)                   |
+| `base` | Base for relative links: `<base href>` if present, else `url` |
+
+A step can stop the branch, continue it, or split it. For example, `find("li")`
+continues once per `<li>`, so every step after it runs once per list item, and the
+branches run concurrently.
+
+Each URL is fetched at most once per run, no matter how many steps lead to it.
+
+When requests are waiting for a free slot, those from later steps in the chain go
+first. A crawl therefore finishes the pages it has already found, such as the
+items on a listing page, before it moves on to more listing pages. Results arrive
+steadily and memory stays flat on large sites.
+
+## Commands
+
+### `Osmotic.get(url)` / `.get(url)`
+
+Loads a page. Relative URLs resolve against the current page, so `.get("/about")`
+works mid-chain.
+
+### `.find(selector)`
+
+Continues the chain once for each element matching `selector` inside the current
+node.
+
+### `.set(fields)`
+
+Extracts values relative to the current node and merges them into `data`. Each
+value is a [spec](#extraction-specs).
+
+```js
+.set({
+  title: 'h1',
+  image: 'meta[property="og:image"]@content',
+  tags: ['.tag'],
+  price: { amount: '.price .value', currency: '.price .currency' },
+})
+```
+
+### `.filter(test)`
+
+Continues only if `test` passes:
+
+- **Selector string:** passes when the current node contains a match.
+- **Function** `($, node, data) => boolean | Promise<boolean>`: passes when it returns true.
+
+```js
+const isProductPage = ($) =>
+  $('script[type="application/ld+json"]').text().includes('"Product"');
+
+.filter(isProductPage)
+```
+
+### `.follow(spec = "a@href")`
+
+Loads every URL found by `spec` and continues the chain on each page. Data
+collected so far carries over to the new pages. Only `http(s)` links are followed,
+and `#fragments` are dropped.
+
+### `.recurse(spec = "a@href", { sameDomain = true, exclude = [] })`
+
+Runs the rest of the chain on the current page, then follows the links found by
+`spec` and repeats on every new page. Together with the once-per-URL rule, this
+crawls a whole site.
+
+- `sameDomain`: only follow links on the current page's hostname.
+- `exclude`: an array of regexes; links whose **pathname** matches any of them are skipped.
+
+```js
+Osmotic.get('https://example.com/')
+  .recurse('a:not([rel~="nofollow"])@href', { exclude: [/^\/checkout\//] })
+  .filter(isProductPage)
+  .set({ title: 'h1' })
+  .csv("products.csv")
+  .config({ maxPages: 500 })
+  .run();
+```
+
+### `.tap(label = "tap")`
+
+Logs `[label] <url>` for every branch that reaches this step, then continues
+unchanged. Handy for watching a crawl's progress or checking which pages a chain
+reaches.
+
+### `.data(callback)`
+
+Calls `callback(data, ctx)` with the collected data, then continues. It may be async.
+
+### `.csv(path, { columns, delimiter = ";", bom = true })`
+
+Writes each `data` object reaching this step as a CSV row, streamed to disk.
+
+- `columns`: the column order. It defaults to the keys of the first row. Fields
+  missing from `columns` are skipped, with one warning.
+- `delimiter` and `bom`: the defaults (semicolon, UTF-8 BOM) open correctly in Excel
+  in locales that use a decimal comma. Use `{ delimiter: ",", bom: false }` for
+  plain CSV.
+
+Objects and arrays are written as JSON. The file is only created once the first
+row arrives.
+
+### `.config(options)`
+
+Merges [options](#options) into the current ones. It can be called anywhere in the chain.
+
+### `.run()`
+
+Runs the chain and returns a promise that resolves when every branch is done.
+CSV files are flushed and closed before it resolves. `run()` logs a short summary
+to the console.
+
+## Extraction specs
+
+Specs are used by `set()`, and the string form by `follow()` and `recurse()`.
+
+| Spec                   | Result                                                  |
+| ---------------------- | ------------------------------------------------------- |
+| `"selector"`           | Trimmed text of the first match                         |
+| `"selector@attr"`      | Attribute of the first match                            |
+| `"@attr"`              | Attribute of the current node itself                    |
+| `""`                   | Text of the current node itself                         |
+| `["selector"]`         | Array of the text of every match                        |
+| `["selector@attr"]`    | Array of the attribute of every match (missing attributes skipped) |
+| `{ key: spec, ... }`   | Nested object, each spec resolved relative to the node  |
+
+With `resolveUrls` on (the default), URL attributes come back absolute:
+`href`, `src`, `action`, `formaction`, `poster`, `cite`, `background`, `longdesc`
+and `data`. Each candidate in a `srcset` is resolved too.
+
+### Selector extras
+
+On top of standard CSS selectors, osmotic supports:
+
+- **XPath-style indexes:** `span[2]` means `span:nth-of-type(2)`. Brackets inside
+  quoted strings are left alone.
+- **`:text-is("…")`:** the element's trimmed text equals the value exactly, e.g.
+  `td:text-is("Price") + td`.
+- **`:text-match("…")`:** the element's trimmed text matches a regex, e.g.
+  `span:text-match("^[0-9]+ W$")`. Write `[0-9]` rather than `\d`, since backslashes
+  don't survive the selector parser.
+
+You can add your own pseudo-classes with the `pseudos` option. Each one is either a
+selector alias or a function `(element, argument) => boolean`:
+
+```js
+.config({
+  pseudos: {
+    sale: '.badge-sale',
+    long: (el) => el.children.length > 10
+  }
+})
+```
+
+## Options
+
+| Option              | Default         | Description |
+| ------------------- | --------------- | ----------- |
+| `concurrency`       | `4`             | Maximum parallel requests. Ignored when `slots` is set. |
+| `maxPages`          | `100`           | Maximum number of fetch attempts per run. |
+| `delay`             | `0`             | Milliseconds to wait before each request. |
+| `userAgent`         | `"osmotic/0.1"` | `User-Agent` header. |
+| `headers`           | `{}`            | Extra headers for every request. |
+| `slots`             | `null`          | Per-slot settings, see below. |
+| `respectRobots`     | `true`          | Skip URLs disallowed by the site's `robots.txt`. |
+| `respectCrawlDelay` | `true`          | Space requests to a site by its `Crawl-delay`, across all slots. |
+| `robotsUserAgent`   | `null`          | User agent to match in `robots.txt`. Defaults to `userAgent`. |
+| `resolveUrls`       | `true`          | Return URL attributes from `set()` as absolute URLs. |
+| `pseudos`           | `{}`            | Custom selector pseudo-classes. |
+
+Only HTML responses with a 2xx status continue the chain. Other responses and
+network errors end that branch; network errors are also logged.
+
+### Slots: proxies and per-request identities
+
+Requests run through a fixed pool of slots. By default there are `concurrency`
+identical slots. Pass `slots` to configure each one; any field left out falls back
+to the global option:
+
+```js
+.config({
+  slots: [
+    { proxy: "http://proxy1:8080", userAgent: "Agent A", delay: 500 },
+    { proxy: "http://proxy2:8080", headers: { "Accept-Language": "sv" } },
+  ],
+})
+```
+
+Proxies are handled by [undici](https://undici.nodejs.org/), which is loaded only
+when a slot uses a proxy. If it isn't already installed, run `npm install undici`.
+
+`robots.txt` itself is always fetched directly, not through a slot.
+
+## Extending osmotic
+
+### Custom steps: `.use(fn)`
+
+A step is `(ctx, next) => Promise`. Call `next(ctx)` once to continue, never to
+stop the branch, or several times to branch.
+
+```js
+.use((ctx, next) => (/ai|llm/i.test(ctx.data.title) ? next(ctx) : Promise.resolve()))
+```
+
+**Return `next()`'s promise; don't `await` it.** A step that is suspended in
+`await next(ctx)` keeps `ctx`, and with it the page's whole DOM, in memory until
+everything after it in the chain has finished on that branch. On a long crawl
+that can be most of the pages ever loaded, and the process runs out of memory.
+`async` steps are fine as long as they end in `return next(ctx)`:
+
+```js
+.use(async (ctx, next) => {
+  ctx.data.extra = await lookup(ctx.data.id); // awaiting your own work is fine
+  return next(ctx); // not: await next(ctx)
+})
+```
+
+### Fetch middleware: `.useFetch(mw)`
+
+Wraps every HTTP request. `mw(req, next)` receives `{ url, headers, slot }` and
+must return a `Response`, usually by calling `next(req)`. Middleware runs in the
+order it was added.
+
+```js
+const retry = (times = 2) => async (req, next) => {
+  for (let attempt = 0; ; attempt++) {
+    const res = await next(req);
+    if ((res.status !== 429 && res.status < 500) || attempt >= times) return res;
+    await new Promise((r) => setTimeout(r, 1000 * 2 ** attempt));
+  }
+};
+
+Osmotic.get("https://example.com").useFetch(retry(2)) /* ... */;
+```
+
+### Reusable commands: `Osmotic.command(name, factory)`
+
+Registers a chainable method on every `Osmotic` instance. `factory(...args)` returns
+a step, and is called with `this` bound to the `Osmotic` instance. Inside a custom
+command you can use `this.fetchPage(url)` and `this.links(ctx, spec)`, the same
+helpers the built-in commands use.
+
+```js
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+Osmotic.command("pause", (ms) => (ctx, next) => sleep(ms).then(() => next(ctx)));
+
+Osmotic.get("https://example.com").pause(500).find("a") /* ... */;
+```
+
+In TypeScript, declare the new method so the compiler knows about it:
+
+```ts
+declare module 'osmotic' {
+  interface Osmotic {
+    pause(ms: number): this;
+  }
+}
+```
+
+The ESM and CommonJS entry points share a single `Osmotic` class, so a command
+registered through one is available through the other.
+
+## TypeScript
+
+Type declarations are included for both entry points. Useful exported types
+include `Step`, `Context`, `Spec`, `OsmoticOptions`, `SlotConfig`, `FetchMiddleware`,
+`FetchRequest`, `CsvOptions`, `RecurseOptions` and `FilterTest`.
+
+## Development
+
+```sh
+npm run build   # clean dist/ and compile src/ with tsc
+npm run clean   # remove dist/
+```
+
+| File               | Responsibility |
+| ------------------ | -------------- |
+| `src/osmotic.ts`      | The `Osmotic` class: commands, page fetching, running |
+| `src/extract.ts`   | Extraction specs and link collection |
+| `src/selectors.ts` | Selector extras (`[n]`, `:text-is`, `:text-match`) |
+| `src/urls.ts`      | URL resolution and `<base href>` handling |
+| `src/csv.ts`       | Streaming CSV writer |
+| `src/robots.ts`    | `robots.txt` cache and `Crawl-delay` scheduling |
+| `src/slots.ts`     | Request slot pool |
+| `src/http.ts`      | Fetch middleware chain and proxy support |
+| `src/types.ts`     | Shared types |
+| `src/index.cts` / `src/index.mts` | CommonJS and ESM entry points |
+
+Examples are in [`examples/`](examples/).
+
+## License
+
+ISC
