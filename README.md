@@ -10,11 +10,13 @@ Inspired by [node-osmosis](https://github.com/rchipka/node-osmosis).
 ```js
 const { Osmotic } = require('osmotic');
 
+Osmotic.plugins([require('osmotic-plugin-csv')]);
+
 Osmotic.get('https://news.ycombinator.com')
 	.recurse('a[rel="next"]@href')
 	.find('tr.athing')
 	.set({ rank: '.rank', title: '.titleline > a', link: '.titleline > a@href' })
-	.csv('hacker-news.csv')
+	.export('csv', 'hacker-news.csv')
 	.config({ maxPages: 20 })
 	.run();
 ```
@@ -23,8 +25,8 @@ Osmotic.get('https://news.ycombinator.com')
 - Extraction specs for text, attributes, lists and nested objects; URLs come back absolute
 - Respects `robots.txt` and `Crawl-delay` by default
 - Concurrency limits, per-request delays, and per-slot proxies, user agents and headers
-- CSV output streamed to disk, Excel-friendly by default
-- Extensible through custom steps, fetch middleware and reusable commands
+- Exports to files through pluggable exporters, such as [CSV](https://www.npmjs.com/package/osmotic-plugin-csv)
+- Extensible through custom steps, fetch middleware, reusable commands and plugins
 - Written in TypeScript; ships ESM and CommonJS entry points with type declarations
 
 Requires Node.js 18 or later (it uses the built-in `fetch`).
@@ -33,6 +35,7 @@ Requires Node.js 18 or later (it uses the built-in `fetch`).
 
 ```sh
 npm install osmotic
+npm install osmotic-plugin-csv   # to export CSV files
 ```
 
 The package ships prebuilt in `dist/` and runs no install scripts.
@@ -129,7 +132,7 @@ Osmotic.get('https://example.com/')
 	.recurse('a:not([rel~="nofollow"])@href', { exclude: [/^\/checkout\//] })
 	.filter(isProductPage)
 	.set({ title: 'h1' })
-	.csv('products.csv')
+	.export('csv', 'products.csv')
 	.config({ maxPages: 500 })
 	.run();
 ```
@@ -144,18 +147,29 @@ reaches.
 
 Calls `callback(data, ctx)` with the collected data, then continues. It may be async.
 
-### `.csv(path, { columns, delimiter = ";", bom = true })`
+### `.export(type, file, options?)`
 
-Writes each `data` object reaching this step as a CSV row, streamed to disk.
+Writes each `data` object reaching this step to `file`, in the format of export
+`type`. What `options` accepts depends on the type. The file is created when the first
+row of a run arrives, so a run without rows creates no file.
 
-- `columns`: the column order. It defaults to the keys of the first row. Fields
-  missing from `columns` are skipped, with one warning.
-- `delimiter` and `bom`: the defaults (semicolon, UTF-8 BOM) open correctly in Excel
-  in locales that use a decimal comma. Use `{ delimiter: ",", bom: false }` for
-  plain CSV.
+osmotic has no export types of its own. They come from [plugins](#plugins), so load
+one before building the chain, or `export()` throws:
 
-Objects and arrays are written as JSON. The file is only created once the first
-row arrives.
+```js
+Osmotic.plugins([require('osmotic-plugin-csv')]);
+
+Osmotic.get('https://example.com/products')
+	.find('.product')
+	.set({ name: 'h2', price: '.price' })
+	.export('csv', 'products.csv', { delimiter: ',' })
+	.run();
+```
+
+The type is given separately rather than read from the file extension, so a plugin can
+offer its own take on a format under a new type name, such as `'csv-excel'`, and files
+can have any name. To write rows somewhere other than a file, use `.data()`, or
+[register an export type](#export-types-osmoticexportertype-factory).
 
 ### `.config(options)`
 
@@ -164,7 +178,7 @@ Merges [options](#options) into the current ones. It can be called anywhere in t
 ### `.run()`
 
 Runs the chain and returns a promise that resolves when every branch is done.
-CSV files are flushed and closed before it resolves. `run()` logs a short summary
+Exports are flushed and closed before it resolves, also when the run fails. `run()` logs a short summary
 to the console.
 
 ## Extraction specs
@@ -263,8 +277,8 @@ handler again. Both return the instance, so they can go anywhere in the chain.
 | `end`   | `{ osmotic, stats: { pages, robotsSkipped, rows }, error? }` | After the run, also when it failed.  |
 
 - `start` handlers are awaited in order, and one that throws aborts the run.
-- `end` handlers are all awaited, even if some throw. `stats.rows` maps each CSV
-  path to the number of rows written, and `error` is set when the run failed.
+- `end` handlers are all awaited, even if some throw. `stats.rows` maps each export
+  file to the number of rows written, and `error` is set when the run failed.
 - `page`, `skip` and `error` handlers are not awaited, so a slow handler never holds
   up the crawl. A handler that throws is logged and doesn't affect the run.
 - `reason` is `robots`, `maxPages`, `status` (not 2xx) or `contentType` (not HTML).
@@ -356,15 +370,53 @@ declare module 'osmotic' {
 The ESM and CommonJS entry points share a single `Osmotic` class, so a command
 registered through one is available through the other.
 
+### Export types: `Osmotic.exporter(type, factory)`
+
+Registers an export type for `.export(type, file, options)`. `factory(file, options)`
+returns an exporter, an object with two methods:
+
+- `write(data)` writes one row. Branches reach the step concurrently, so rows arrive in
+  no particular order. If it returns a promise, the branch waits for it.
+- `end()` flushes and closes. It is called once when the run ends, also when the run
+  failed, and may return a promise. If it throws, the run fails.
+
+osmotic calls the factory on the first row of each run, so every run gets a fresh
+exporter, and counts the rows for `stats.rows` and the summary.
+
+```js
+const fs = require('node:fs');
+
+Osmotic.exporter('jsonl', (file) => {
+	const stream = fs.createWriteStream(file);
+	return {
+		write: (data) => stream.write(JSON.stringify(data) + '\n'),
+		end: () => new Promise((resolve) => stream.end(resolve)),
+	};
+});
+
+Osmotic.get('https://example.com').set({ title: 'h1' }).export('jsonl', 'titles.jsonl').run();
+```
+
+Registering a type that already exists throws. In TypeScript, declare the type's
+options so `.export()` checks them:
+
+```ts
+declare module 'osmotic' {
+	interface ExportTypes {
+		jsonl: { pretty?: boolean };
+	}
+}
+```
+
 ## Plugins
 
-Plugins are npm packages that add commands and fetch middleware. Load them once,
+Plugins are npm packages that add commands, export types and fetch middleware. Load them once,
 before building any chains:
 
 ```js
 const { Osmotic } = require('osmotic');
 
-Osmotic.plugins([require('osmotic-plugin-playwright')]);
+Osmotic.plugins([require('osmotic-plugin-playwright'), require('osmotic-plugin-csv')]);
 
 Osmotic.get('https://example.com') /* ... */;
 ```
@@ -373,24 +425,28 @@ Osmotic.get('https://example.com') /* ... */;
 
 - **Commands** from a plugin are available on every instance, like ones registered
   with `Osmotic.command()`.
+- **Export types** from a plugin can be used with `.export()`, like ones registered
+  with `Osmotic.exporter()`.
 - **Fetch middleware** from a plugin is added to every chain created after the plugin
   is loaded. It runs after the chain's own `useFetch()` middleware, closest to the
   network.
 - **Loading is all or nothing.** If any entry is invalid, has the same name as a
-  loaded plugin, or adds a command that already exists, `plugins()` throws and loads
+  loaded plugin, or adds a command or export type that already exists, `plugins()` throws and loads
   nothing from the list.
 - Loading the same entry twice does nothing, so libraries can load the plugins they
   depend on without coordinating.
 
 ### Writing a plugin
 
-A plugin is an object with a `name` and at least one of `commands` and `fetch`:
+A plugin is an object with a `name` and at least one of `commands`, `exporters` and
+`fetch`:
 
-| Field      | Type                            | Description                                                        |
-| ---------- | ------------------------------- | ------------------------------------------------------------------ |
-| `name`     | `string`                        | Unique name, normally the package name.                            |
-| `commands` | `{ [name]: (...args) => step }` | Chainable commands, each a factory as in `Osmotic.command()`.      |
-| `fetch`    | `FetchMiddleware[]`             | Middleware for every request. `onStart` and `onEnd` hooks run too. |
+| Field       | Type                                      | Description                                                        |
+| ----------- | ----------------------------------------- | ------------------------------------------------------------------ |
+| `name`      | `string`                                  | Unique name, normally the package name.                            |
+| `commands`  | `{ [name]: (...args) => step }`           | Chainable commands, each a factory as in `Osmotic.command()`.      |
+| `exporters` | `{ [type]: (file, options) => exporter }` | Export types, each a factory as in `Osmotic.exporter()`.           |
+| `fetch`     | `FetchMiddleware[]`                       | Middleware for every request. `onStart` and `onEnd` hooks run too. |
 
 ```js
 // osmotic-plugin-pause/index.js
@@ -432,10 +488,10 @@ Conventions for publishing:
 
 - Name the package `osmotic-plugin-<name>` (or `@scope/osmotic-plugin-<name>`) and
   add the keyword `osmotic-plugin`.
-- List osmotic as a peer dependency, e.g. `"peerDependencies": { "osmotic": "^2.1.0" }`,
+- List osmotic as a peer dependency, e.g. `"peerDependencies": { "osmotic": "^3.0.0" }`,
   rather than a regular dependency.
 - In TypeScript, type the plugin as `OsmoticPlugin` and declare its commands so
-  callers get them on `Osmotic`:
+  callers get them on `Osmotic` (and any export types' options in `ExportTypes`):
 
 ```ts
 import type { OsmoticPlugin } from 'osmotic';
@@ -467,8 +523,9 @@ runs or count how many are active.
 
 Type declarations are included for both entry points. Useful exported types
 include `Step`, `Context`, `Spec`, `OsmoticOptions`, `SlotConfig`, `FetchMiddleware`,
-`FetchRequest`, `CsvOptions`, `RecurseOptions`, `FilterTest`, `OsmoticEvents`,
-`RunStats`, `SkipReason`, `OsmoticPlugin` and `PluginInput`. The public API carries TSDoc comments, so editors show
+`FetchRequest`, `RecurseOptions`, `FilterTest`, `OsmoticEvents`, `RunStats`,
+`SkipReason`, `OsmoticPlugin`, `PluginInput`, `Exporter`, `ExporterFactory`,
+`ExportTypes` and `ExportOptions`. The public API carries TSDoc comments, so editors show
 documentation on hover.
 
 ## Development
@@ -493,7 +550,7 @@ Code uses single quotes and tab indentation, set in `.prettierrc.json` and
 | `src/selectors.ts`                | Selector extras (`[n]`, `:text-is`, `:text-match`)    |
 | `src/urls.ts`                     | URL resolution and `<base href>` handling             |
 | `src/events.ts`                   | Run events and their typed emitter                    |
-| `src/csv.ts`                      | Streaming CSV writer                                  |
+| `src/exporters.ts`                | Export types and the exporters of `export()` steps    |
 | `src/robots.ts`                   | `robots.txt` cache and `Crawl-delay` scheduling       |
 | `src/slots.ts`                    | Request slot pool                                     |
 | `src/http.ts`                     | Fetch middleware chain and proxy support              |

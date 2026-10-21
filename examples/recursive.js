@@ -5,6 +5,5 @@ Osmotic.get('https://news.ycombinator.com')
 	.find('tr.athing')
 	.set({ rank: '.rank', title: '.titleline > a', href: '.titleline > a@href' })
 	.data((item) => console.log(item))
-	.csv('news.ycombinator.com.csv')
 	.config({ maxPages: 100, concurrency: 2, respectCrawlDelay: false })
 	.run();

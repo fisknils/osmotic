@@ -4,6 +4,45 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows
 [Semantic Versioning](https://semver.org/).
 
+## [3.0.0] - 2026-10-21
+
+### Breaking changes
+
+- `.csv()` is removed. CSV export moved to the
+  [`osmotic-plugin-csv`](https://www.npmjs.com/package/osmotic-plugin-csv) plugin and
+  is used through the new `.export()` command, with the same options.
+- The `CsvOptions` type is no longer exported; it comes with the plugin.
+- `run()` now fails when an exporter fails to close.
+
+To migrate, install `osmotic-plugin-csv`, load it, and replace `.csv(path, options)`
+with `.export('csv', path, options)`:
+
+```js
+Osmotic.plugins([require('osmotic-plugin-csv')]);
+
+Osmotic.get(url) /* ... */
+	.export('csv', 'out.csv', { delimiter: ',' })
+	.run();
+```
+
+### Added
+
+- `.export(type, file, options?)` writes each row to a file in the format of an export
+  type. Export types come from plugins, so a plugin can provide a format under any
+  type name, independent of the file extension.
+- `Osmotic.exporter(type, factory)` registers an export type.
+- Plugins can add export types through a new `exporters` field.
+- Exported types `Exporter`, `ExporterFactory`, `ExportTypes` and `ExportOptions`.
+  Plugins declare their types' options by merging into `ExportTypes`.
+
+### Changed
+
+- `stats.rows` in the `end` event maps each export file to its row count.
+
+### Fixed
+
+- `Osmotic.plugins()` rejects a plugin whose `commands` is an array. Before, `[fn]` registered a command named `0`.
+
 ## [2.1.0] - 2026-10-21
 
 ### Added
@@ -68,6 +107,7 @@ const { Osmotic } = require('osmotic');
 
 Last release as `@fisknils/osmo`.
 
+[3.0.0]: https://www.npmjs.com/package/osmotic/v/3.0.0
 [2.1.0]: https://www.npmjs.com/package/osmotic/v/2.1.0
 [2.0.1]: https://www.npmjs.com/package/osmotic/v/2.0.1
 [2.0.0]: https://www.npmjs.com/package/osmotic/v/2.0.0
