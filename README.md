@@ -477,6 +477,7 @@ documentation on hover.
 npm install            # install dependencies (does not build)
 npm run build          # clean dist/ and compile src/ with tsc (also runs before npm publish)
 npm run clean          # remove dist/
+npm test               # build, type-check test/ and test-d/, and run the tests
 npm run format         # format everything with Prettier
 npm run format:check   # check formatting without writing
 ```
@@ -499,7 +500,8 @@ Code uses single quotes and tab indentation, set in `.prettierrc.json` and
 | `src/types.ts`                    | Shared types                                          |
 | `src/index.cts` / `src/index.mts` | CommonJS and ESM entry points                         |
 
-Examples are in [`examples/`](examples/).
+Examples are in [`examples/`](examples/). Tests are in [`test/`](test/), served from local
+test sites built with `test/helpers/create-site.ts`, and type tests in [`test-d/`](test-d/).
 
 ## License
 
