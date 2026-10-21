@@ -65,7 +65,7 @@ git worktree remove <scratch>/review-<n> && git branch -D review/<n>
 - Bugs: wrong conditions, missed cases, errors swallowed or thrown in the wrong place, promises not awaited or not
   returned.
 - osmotic specifics: branches run concurrently, so shared state and ordering need care. Steps should return `next()`'s
-  promise instead of awaiting it, so a page's DOM isn't kept alive (see the comment in `src/osmotic.ts`). Each URL is
+  promise instead of awaiting it, so a page's DOM isn't kept alive (see the comment in `src/core/page.ts`). Each URL is
   fetched once per run. `run()` closes exporters and fires `end` also when it fails. The defaults stay polite:
   `robots.txt` and `Crawl-delay` are respected unless the user opts out.
 - Public API: type declarations match behavior, both entry points export what they should, and TSDoc is accurate.

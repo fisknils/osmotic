@@ -559,20 +559,13 @@ npm run format:check   # check formatting without writing
 Code uses single quotes and tab indentation, set in `.prettierrc.json` and
 `.editorconfig`.
 
-| File                              | Responsibility                                        |
-| --------------------------------- | ----------------------------------------------------- |
-| `src/osmotic.ts`                  | The `Osmotic` class: commands, page fetching, running |
-| `src/plugins.ts`                  | Plugin format, checks and loading                     |
-| `src/extract.ts`                  | Extraction specs and link collection                  |
-| `src/selectors.ts`                | Selector extras (`[n]`, `:text-is`, `:text-match`)    |
-| `src/urls.ts`                     | URL resolution and `<base href>` handling             |
-| `src/events.ts`                   | Run events and their typed emitter                    |
-| `src/exporters.ts`                | Export types and the exporters of `export()` steps    |
-| `src/robots.ts`                   | `robots.txt` cache and `Crawl-delay` scheduling       |
-| `src/slots.ts`                    | Request slot pool                                     |
-| `src/http.ts`                     | Fetch middleware chain and proxy support              |
-| `src/types.ts`                    | Shared types                                          |
-| `src/index.cts` / `src/index.mts` | CommonJS and ESM entry points                         |
+| Folder                            | Contents                                                                                                                    |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `src/index.cts` / `src/index.mts` | CommonJS and ESM entry points                                                                                               |
+| `src/core/`                       | The `Osmotic` class and what it runs on: events, exporters, plugin loading, fetch middleware, `robots.txt` cache, slot pool |
+| `src/commands/`                   | The built-in chain commands, one file per command (`get.ts`, `find.ts`, `recurse.ts` and so on)                             |
+| `src/types/`                      | Public types, one file per concern                                                                                          |
+| `src/utils/`                      | Small helpers: extraction specs, link collection, selector extras, URL resolution                                           |
 
 Examples are in [`examples/`](examples/). Tests are in [`test/`](test/), served from local
 test sites built with `test/helpers/create-site.ts`, and type tests in [`test-d/`](test-d/).
