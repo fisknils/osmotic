@@ -364,7 +364,8 @@ after itself.
 Registers a chainable method on every `Osmotic` instance. `factory(...args)` returns
 a step, and is called with `this` bound to the `Osmotic` instance. Inside a custom
 command you can use `this.fetchPage(url)` and `this.links(ctx, spec)`, the same
-helpers the built-in commands use.
+helpers the built-in commands use. A name that an `Osmotic` method or property already
+has, such as `find` or `opts`, throws.
 
 ```js
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
