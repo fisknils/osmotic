@@ -25,25 +25,30 @@ test('a long crawl keeps only the pages it is working on in memory', async (t) =
 		})
 		.run();
 	assert.equal(mostAlive.length, 30);
-	assert.ok(Math.max(...mostAlive) <= 3, `page DOMs alive at each page: ${mostAlive.join(', ')}`);
+	assert.deepEqual(mostAlive, Array(30).fill(1), `page DOMs alive at each page: ${mostAlive.join(', ')}`);
 });
 
-test("a page's DOM is released while requests for its links wait for a slot", async (t) => {
-	const site = await openSite(t, archive({ pages: 1, articles: 20 }));
-	const pages = new LiveSet<CheerioAPI>();
-	const listingAlive: boolean[] = [];
-	await Osmotic.get(site.url(archivePage(1)))
-		.use(track(pages))
-		.follow('article a@href')
-		.use(async (ctx, next) => {
-			listingAlive.push((await pages.alive()).includes(archivePage(1)));
-			return next(ctx);
-		})
-		.config({ concurrency: 1 })
-		.run();
-	assert.equal(listingAlive.length, 20);
-	assert.deepEqual(listingAlive, Array(20).fill(false), 'the listing page is collected before its articles finish');
-});
+for (const command of ['follow', 'recurse'] as const) {
+	test(`a page's DOM is released while requests for its links wait for a slot (${command})`, async (t) => {
+		const site = await openSite(t, archive({ pages: 1, articles: 20 }));
+		const pages = new LiveSet<CheerioAPI>();
+		const listingAlive: boolean[] = [];
+		await Osmotic.get(site.url(archivePage(1)))
+			.use(track(pages))
+			[command]('article a@href')
+			.use(async (ctx, next) => {
+				// recurse() also continues on the listing page itself, which is alive then
+				if (new URL(ctx.url!).pathname !== archivePage(1)) {
+					listingAlive.push((await pages.alive()).includes(archivePage(1)));
+				}
+				return next(ctx);
+			})
+			.config({ concurrency: 1 })
+			.run();
+		assert.equal(listingAlive.length, 20);
+		assert.deepEqual(listingAlive, Array(20).fill(false), 'the listing page is collected before its articles finish');
+	});
+}
 
 // osmotic copies attribute values (detach() in src/extract.ts), because V8 can keep a short
 // substring as a slice of the whole page. cheerio's current parser builds new strings, so this

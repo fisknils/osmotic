@@ -2,10 +2,7 @@ import type { Step } from '../../src/index.cjs';
 import { setFlagsFromString } from 'node:v8';
 import { runInNewContext } from 'node:vm';
 
-// Expose V8's gc() without the --expose-gc flag. It only affects this process, and
-// each test file runs in its own.
-setFlagsFromString('--expose-gc');
-const runGc = runInNewContext('gc') as () => void;
+let runGc: (() => void) | undefined;
 
 /**
  * Run a full garbage collection. Objects reached through a `WeakRef` in the current
@@ -13,6 +10,12 @@ const runGc = runInNewContext('gc') as () => void;
  */
 export async function collectGarbage(): Promise<void> {
 	await new Promise((resolve) => setImmediate(resolve));
+	// Expose V8's gc() without the --expose-gc flag, on first use, so only the
+	// processes of test files that collect garbage get the flag
+	if (!runGc) {
+		setFlagsFromString('--expose-gc');
+		runGc = runInNewContext('gc') as () => void;
+	}
 	runGc();
 }
 
