@@ -35,8 +35,7 @@ Requires Node.js 18 or later (it uses the built-in `fetch`).
 npm install osmotic
 ```
 
-`npm install` also runs the build through the `prepare` script. The compiled
-package lives in `dist/`.
+The package ships prebuilt in `dist/` and runs no install scripts.
 
 ```js
 // CommonJS
@@ -368,7 +367,8 @@ documentation on hover.
 ## Development
 
 ```sh
-npm run build          # clean dist/ and compile src/ with tsc
+npm install            # install dependencies (does not build)
+npm run build          # clean dist/ and compile src/ with tsc (also runs before npm publish)
 npm run clean          # remove dist/
 npm run format         # format everything with Prettier
 npm run format:check   # check formatting without writing

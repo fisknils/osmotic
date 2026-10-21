@@ -1,6 +1,6 @@
 {
 	"name": "osmotic",
-	"version": "2.0.0",
+	"version": "2.0.1",
 	"description": "Chainable web scraper for Node.js: find, extract and follow with CSS selectors, respects robots.txt, streams results to CSV",
 	"license": "ISC",
 	"author": "",
@@ -19,7 +19,7 @@
 	},
 	"scripts": {
 		"build": "npm run clean && tsc",
-		"prepare": "npm run build",
+		"prepublishOnly": "npm run build",
 		"clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
 		"format": "prettier --write .",
 		"format:check": "prettier --check ."
