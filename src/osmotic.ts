@@ -1,7 +1,7 @@
 import * as cheerio from 'cheerio';
 import type { CheerioAPI } from 'cheerio';
-import { CsvSink, type CsvOptions } from './csv.js';
 import { Emitter, type Handler, type OsmoticEvent, type RunStats, type SkipReason } from './events.js';
+import { addExporter, exporterFor, ExportTarget, type ExporterFactory, type ExportOptions } from './exporters.js';
 import { links, pick } from './extract.js';
 import { fetchThrough } from './http.js';
 import { loadPlugins, pluginMiddleware, type PluginInput } from './plugins.js';
@@ -83,7 +83,7 @@ const all = (branches: Promise<unknown>[]): Promise<void> => Promise.all(branche
  * await Osmotic.get('https://news.ycombinator.com')
  * 	.find('tr.athing')
  * 	.set({ title: '.titleline > a' })
- * 	.csv('hn.csv')
+ * 	.export('csv', 'hn.csv')
  * 	.run();
  * ```
  */
@@ -104,7 +104,7 @@ export class Osmotic {
 	};
 
 	private readonly steps: Step[] = [];
-	private readonly sinks: CsvSink[] = [];
+	private readonly exports: ExportTarget[] = [];
 	private readonly fetchMiddleware: FetchMiddleware[] = [];
 	private readonly events = new Emitter();
 	private state: RunState | null = null;
@@ -211,14 +211,26 @@ export class Osmotic {
 	}
 
 	/**
-	 * Load plugins: their commands become available on every instance, and their fetch
+	 * Register an export type on all Osmotic instances, for {@link Osmotic.export}.
+	 *
+	 * @param type - The type name, such as `'csv'`.
+	 * @param factory - Creates the exporter for a step's file and options. Called on the
+	 * first row of each run.
+	 * @throws If an exporter for `type` already exists.
+	 */
+	static exporter<O = any>(type: string, factory: ExporterFactory<O>): void {
+		addExporter(type, factory);
+	}
+
+	/**
+	 * Load plugins: their commands and exporters become available on every instance, and their fetch
 	 * middleware is added to every chain created afterwards, so load plugins first.
 	 *
 	 * Each entry is a plugin object, or a function returning one, which is called
 	 * without arguments. Loading the same entry again does nothing.
 	 *
 	 * @throws If an entry is not a valid plugin, another plugin with the same name is
-	 * loaded, or a command name is taken. Nothing in the list is loaded then.
+	 * loaded, or a command name or export type is taken. Nothing in the list is loaded then.
 	 *
 	 * @example
 	 * ```ts
@@ -226,11 +238,10 @@ export class Osmotic {
 	 * ```
 	 */
 	static plugins(list: PluginInput[]): typeof Osmotic {
-		loadPlugins(
-			list,
-			(name) => name in Osmotic.prototype,
-			(name, factory) => Osmotic.command(name, factory),
-		);
+		loadPlugins(list, {
+			hasCommand: (name) => name in Osmotic.prototype,
+			addCommand: (name, factory) => Osmotic.command(name, factory),
+		});
 		return Osmotic;
 	}
 
@@ -330,16 +341,23 @@ export class Osmotic {
 	}
 
 	/**
-	 * Write each data object reaching this step as a CSV row, streamed to disk.
-	 * Columns come from `options.columns`, or from the keys of the first row.
+	 * Write each data object reaching this step to `file`, in the format of export
+	 * `type`. Export types come from plugins, such as `osmotic-plugin-csv`, so load them
+	 * before building the chain. The file is created on the first row of each run.
+	 *
+	 * @param options - Passed to the exporter; what it accepts depends on the type.
+	 * @throws If no exporter for `type` is loaded.
+	 *
+	 * @example
+	 * ```ts
+	 * .export('csv', 'products.csv', { delimiter: ',' })
+	 * ```
 	 */
-	csv(path: string, options: CsvOptions = {}): this {
-		const sink = new CsvSink(path, options);
-		this.sinks.push(sink);
-		return this.add((ctx, next) => {
-			sink.write(ctx.data);
-			return next(ctx);
-		});
+	export<T extends string>(type: T, file: string, options?: ExportOptions<T>): this {
+		const factory = exporterFor(type);
+		const target = new ExportTarget(file, () => factory(file, options));
+		this.exports.push(target);
+		return this.add((ctx, next) => Promise.resolve(target.write(ctx.data)).then(() => next(ctx)));
 	}
 
 	// --- Helpers for custom commands -------------------------------------------
@@ -407,8 +425,8 @@ export class Osmotic {
 	/**
 	 * Run the chain. Resolves once every branch has finished.
 	 *
-	 * CSV files are closed and `end` handlers run even if the run fails.
-	 * @throws What a step or `start` handler threw.
+	 * Exporters are closed and `end` handlers run even if the run fails.
+	 * @throws What a step, `start` handler or exporter threw.
 	 */
 	async run(): Promise<void> {
 		const slotConfigs = this.opts.slots ?? Array.from({ length: this.opts.concurrency }, () => ({}));
@@ -421,7 +439,8 @@ export class Osmotic {
 			robotsSkipped: 0,
 		};
 		this.state = run;
-		for (const sink of this.sinks) sink.reset();
+		for (const target of this.exports) target.reset();
+		let failed = false;
 		let failure: unknown;
 		// A step that throws synchronously rejects only its own branch, as an async step would
 		const runFrom =
@@ -438,22 +457,22 @@ export class Osmotic {
 			await this.events.emitSerial('start', { osmotic: this });
 			await runFrom(0)({ data: {} });
 		} catch (err) {
+			failed = true;
 			failure = err;
-			throw err;
-		} finally {
-			await this.closeSinks();
-			const stats: RunStats = {
-				pages: run.pages,
-				robotsSkipped: run.robotsSkipped,
-				rows: Object.fromEntries(this.sinks.map((s) => [s.path, s.rowCount])),
-			};
-			await this.events.emitSettled('end', {
-				osmotic: this,
-				stats,
-				...(failure !== undefined ? { error: failure } : {}),
-			});
-			this.state = null;
 		}
+		// An exporter that fails to close fails the run, unless it had already failed
+		for (const err of await this.closeExports()) {
+			if (failed) console.error(`osmotic: closing an export failed: ${err instanceof Error ? err.stack : err}`);
+			else [failed, failure] = [true, err];
+		}
+		const stats: RunStats = {
+			pages: run.pages,
+			robotsSkipped: run.robotsSkipped,
+			rows: Object.fromEntries(this.exports.map((t) => [t.file, t.rowCount])),
+		};
+		await this.events.emitSettled('end', { osmotic: this, stats, ...(failed ? { error: failure } : {}) });
+		this.state = null;
+		if (failed) throw failure;
 		console.log(`Done. Fetched ${run.pages} page(s).`);
 		if (run.robotsSkipped) console.log(`Skipped ${run.robotsSkipped} URL(s) disallowed by robots.txt.`);
 	}
@@ -497,8 +516,10 @@ export class Osmotic {
 		if (mw.onEnd) this.on('end', () => mw.onEnd!());
 	}
 
-	private async closeSinks(): Promise<void> {
-		await Promise.all(this.sinks.map((s) => s.end()));
-		for (const s of this.sinks) console.log(s.summary());
+	// Close every export, even if some fail, and return the errors
+	private async closeExports(): Promise<unknown[]> {
+		const results = await Promise.allSettled(this.exports.map((t) => t.end()));
+		for (const t of this.exports) console.log(t.summary());
+		return results.flatMap((r) => (r.status === 'rejected' ? [r.reason] : []));
 	}
 }

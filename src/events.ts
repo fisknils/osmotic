@@ -18,7 +18,7 @@ export interface RunStats {
 	pages: number;
 	/** URLs skipped because `robots.txt` disallowed them. */
 	robotsSkipped: number;
-	/** Rows written, by CSV path. */
+	/** Rows written, by export file. */
 	rows: Record<string, number>;
 }
 

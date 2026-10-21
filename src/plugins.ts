@@ -1,8 +1,9 @@
+import { addExporter, hasExporter, type ExporterFactory } from './exporters.js';
 import type { Osmotic } from './osmotic.js';
 import type { FetchMiddleware, Step } from './types.js';
 
 /**
- * A plugin: commands and fetch middleware packaged for reuse, usually as an npm
+ * A plugin: commands, exporters and fetch middleware packaged for reuse, usually as an npm
  * package named `osmotic-plugin-<name>`. Load it with {@link Osmotic.plugins}.
  *
  * @example
@@ -27,6 +28,11 @@ export interface OsmoticPlugin {
 	 * {@link Osmotic.command}: it returns the step, with `this` bound to the instance.
 	 */
 	commands?: Record<string, (this: Osmotic, ...args: any[]) => Step>;
+	/**
+	 * Export types for `.export(type, file, options)`, by type name. Each works like a
+	 * factory passed to {@link Osmotic.exporter}.
+	 */
+	exporters?: Record<string, ExporterFactory>;
 	/**
 	 * Fetch middleware for every chain created after the plugin is loaded. It runs after
 	 * the chain's own `useFetch()` middleware, closest to the network, and its `onStart`
@@ -60,32 +66,40 @@ function resolve(input: unknown): OsmoticPlugin {
 	if (!isRecord(value) || typeof value.name !== 'string' || !value.name) {
 		throw new TypeError('Not an osmotic plugin: expected an object with a name, or a function returning one');
 	}
-	const { name, commands, fetch } = value;
-	if (commands !== undefined) {
-		if (!isRecord(commands)) throw new TypeError(`Plugin "${name}": commands must be an object`);
-		for (const [cmd, factory] of Object.entries(commands)) {
-			if (typeof factory !== 'function') {
-				throw new TypeError(`Plugin "${name}": command "${cmd}" must be a function`);
-			}
-		}
-	}
+	const { name, commands, exporters, fetch } = value;
+	checkFactories(name, 'command', commands);
+	checkFactories(name, 'exporter', exporters);
 	if (fetch !== undefined && (!Array.isArray(fetch) || fetch.some((mw) => typeof mw !== 'function'))) {
 		throw new TypeError(`Plugin "${name}": fetch must be an array of middleware functions`);
 	}
 	return value as unknown as OsmoticPlugin;
 }
 
+// Throws unless map is undefined or an object of functions
+function checkFactories(plugin: string, kind: 'command' | 'exporter', map: unknown): void {
+	if (map === undefined) return;
+	if (!isRecord(map)) throw new TypeError(`Plugin "${plugin}": ${kind}s must be an object`);
+	for (const [key, factory] of Object.entries(map)) {
+		if (typeof factory !== 'function') {
+			throw new TypeError(`Plugin "${plugin}": ${kind} "${key}" must be a function`);
+		}
+	}
+}
+
+// How loadPlugins() reaches the Osmotic class, which imports this module
+export interface PluginHost {
+	hasCommand(name: string): boolean;
+	addCommand(name: string, factory: (this: Osmotic, ...args: any[]) => Step): void;
+}
+
 // Check every plugin in list before loading any, so a failed call loads nothing.
 // Inputs loaded before are skipped; a different plugin with a taken name throws.
-export function loadPlugins(
-	list: readonly PluginInput[],
-	commandExists: (name: string) => boolean,
-	addCommand: (name: string, factory: (this: Osmotic, ...args: any[]) => Step) => void,
-): void {
+export function loadPlugins(list: readonly PluginInput[], host: PluginHost): void {
 	if (!Array.isArray(list)) throw new TypeError('Osmotic.plugins() expects an array of plugins');
 	const batch: { input: unknown; plugin: OsmoticPlugin }[] = [];
 	const names = new Set<string>();
 	const commands = new Set<string>();
+	const types = new Set<string>();
 	for (const input of list) {
 		if (loadedInputs.has(input) || batch.some((b) => b.input === input)) continue;
 		const plugin = resolve(input);
@@ -93,16 +107,23 @@ export function loadPlugins(
 			throw new Error(`Plugin "${plugin.name}" is already loaded`);
 		}
 		for (const cmd of Object.keys(plugin.commands ?? {})) {
-			if (commandExists(cmd) || commands.has(cmd)) {
+			if (host.hasCommand(cmd) || commands.has(cmd)) {
 				throw new Error(`Plugin "${plugin.name}": command "${cmd}" already exists`);
 			}
 			commands.add(cmd);
+		}
+		for (const type of Object.keys(plugin.exporters ?? {})) {
+			if (hasExporter(type) || types.has(type)) {
+				throw new Error(`Plugin "${plugin.name}": exporter "${type}" already exists`);
+			}
+			types.add(type);
 		}
 		names.add(plugin.name);
 		batch.push({ input, plugin });
 	}
 	for (const { input, plugin } of batch) {
-		for (const [cmd, factory] of Object.entries(plugin.commands ?? {})) addCommand(cmd, factory);
+		for (const [cmd, factory] of Object.entries(plugin.commands ?? {})) host.addCommand(cmd, factory);
+		for (const [type, factory] of Object.entries(plugin.exporters ?? {})) addExporter(type, factory);
 		pluginMiddleware.push(...(plugin.fetch ?? []));
 		loadedNames.add(plugin.name);
 		loadedInputs.add(input);

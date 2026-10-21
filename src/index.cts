@@ -1,5 +1,5 @@
 export { Osmotic, type FilterTest, type RecurseOptions } from './osmotic.js';
-export type { CsvOptions } from './csv.js';
+export type { Exporter, ExporterFactory, ExportOptions, ExportTypes } from './exporters.js';
 export type { OsmoticPlugin, PluginInput } from './plugins.js';
 export type { Handler, OsmoticEvent, OsmoticEvents, RunStats, SkipReason } from './events.js';
 export type {
