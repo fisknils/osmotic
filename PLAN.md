@@ -8,6 +8,12 @@
 
    > fix issue #16
 
+2. The pr-review agent found the pull request ready to merge, with one optional nit: the changelog didn't say that
+   code reading the internal fields at runtime stops working. Claude proposed posting the review, adding that line,
+   resolving the conversation and merging.
+
+   > doit
+
 ## Interpretation
 
 `Osmotic.command()` and `Osmotic.plugins()` check whether a command name is taken with `name in Osmotic.prototype`.
