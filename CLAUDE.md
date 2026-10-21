@@ -80,11 +80,14 @@ Commit the tests before the code, so the history shows they came first.
 ### Writing tests
 
 - Use `node:test` and `node:assert/strict`. Tests are TypeScript, run with `tsx`, and import from `src/`. The only exception is `test/package.ts`, which checks the build in `dist/`.
-- Serve pages with `createSite()` from `test/helpers/`: it maps paths to pages on a local HTTP server, records every request in `site.requests`, and serves the same site as `site.otherOrigin` under a second hostname for cross-domain tests. Close each site when its test ends.
+- Serve pages with `createSite()` from `test/helpers/`: it maps paths to pages on a local HTTP server, records every request in `site.requests`, and serves the same site as `site.otherOrigin` under a second hostname for cross-domain tests. Use `openSite(t, pages)`, which closes the site when test `t` ends.
+- Prefer the scenario sites in `test/helpers/sites/` (a web shop, a news aggregator, a blog with `<base href>`) over one-off pages, and add pages to them when a test needs a situation real sites have. Keep one-off pages for syntax details, such as a selector edge case.
+- Run chains with `scrape()` from `test/helpers/`, which returns the rows and every event of the run.
 - Never use `data:` URLs or real websites. Pages behind `data:` URLs can't link to each other and skip the HTTP layer, and real websites make tests slow and flaky.
 - Paths without an entry return 404, so a site without `/robots.txt` allows everything. Add a `/robots.txt` page to test robots handling.
 - Commands and plugins registered with `Osmotic.command()`, `Osmotic.plugins()` and similar are global and can't be removed, so use names unique to the test file. Each test file runs in its own process.
 - Branches run concurrently, so don't assert on the order of rows or requests that run in parallel; sort them first.
+- A test that exposes a bug in existing code keeps its assertion as written. Mark it `{ todo: '<reason>' }` so it is reported without failing the run, record the bug in `PLAN.md` under Follow-ups, and fix it on a `fix/` branch that removes the `todo`.
 
 ### Skipping tests
 
