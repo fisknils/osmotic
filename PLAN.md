@@ -10,6 +10,12 @@
 
    > skip posting a review on #10. throw on @attr fold fix into the 3.1.0 changelog entry without bumping
 
+2. The pr-review agent found #11 ready to merge, with one should-fix: the TSDoc on `Spec` and the comment above
+   `pick()` don't mention that the list selector takes no `@attr`. Claude asked whether to fix it, post the review and
+   merge.
+
+   > post the review, fix the tsdoc and then merge
+
 ## Interpretation
 
 In a list spec `["selector", { key: spec }]`, the selector goes through the same selector extras as every other
@@ -31,7 +37,7 @@ None. 3.1.0 is unpublished; the fix is folded into it.
 
 ## Scope
 
-- `pick()` in `src/extract.ts`, tests in `test/set.ts`, the 3.1.0 entry in `CHANGELOG.md`, and the list spec note in
+- `pick()` and its comment in `src/extract.ts`, the TSDoc on `Spec` in `src/types.ts`, tests in `test/set.ts`, the 3.1.0 entry in `CHANGELOG.md`, and the list spec note in
   `README.md`.
 - Left out: posting the review on #10.
 
