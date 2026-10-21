@@ -20,6 +20,20 @@
 
    > can we use arrow- functions in Osmotic.ts for the one- line methods?
 
+4. Claude recommended keeping them as methods and opened the pull request. The maintainer then looked at the TSDoc on
+   the class, where only a few methods had `@param`, `@throws` or `@example`.
+
+   > I'm noticing that you're only documenting a handful of methods fully. Is that really best practice?
+
+5. Claude agreed it isn't, proposed a standard with `@param` for parameters whose meaning isn't obvious, and suggested
+   a separate branch after this one.
+
+   > Maybe add @param for each parameter period?
+
+6. Claude agreed, added `@typeParam` for type parameters, and asked whether to merge this branch first.
+
+   > No, add full TSDoc right away
+
 ## Interpretation
 
 Move `src/` into the layout CLAUDE.md describes, with no behavior changes:
@@ -36,6 +50,12 @@ Move `src/` into the layout CLAUDE.md describes, with no behavior changes:
 
 CLAUDE.md's project structure gets the `commands/` folder. The README's development table lists the new files.
 `test/create-site.ts` stays where it is: it tests the `createSite()` helper, so it belongs in `test/`.
+
+On the same branch (prompts 4 to 6), complete TSDoc for everything the entry points export, the step functions in
+`src/commands/` and `CommandHost`: a summary, `@param` for every parameter, `@typeParam` for every type parameter,
+`@returns` where a value is returned (not on chainable methods), `@throws`, and an `@example` on every public method.
+CLAUDE.md gets a "Documentation comments" section with this standard, and the pr-review agent checks that TSDoc is
+complete, not only accurate.
 
 ## Type
 
@@ -67,3 +87,7 @@ the internal paths in `dist/` aren't reachable by users.
 - The plugins augment `declare module 'osmotic'`, not internal paths, and `exports` in `package.json` only exposes the
   entry points, so no plugin can reach the moved files. Checked by searching the sibling plugin repositories.
 - The examples still parse (`node -c examples/*.js`).
+- A script checked that every parameter of every public `Osmotic` method and every command step function has a
+  `@param`, every type parameter a `@typeParam`, and every public method an `@example`. Every exported type and
+  interface member has a doc comment. The examples were checked by hand against the advice around them; they aren't
+  compiled.
