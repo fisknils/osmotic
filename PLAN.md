@@ -41,6 +41,12 @@
 
    > yes
 
+8. The re-review confirmed 12 of the 13 fixes. Left: `exportStep`'s `@throws` didn't say that the exporter can fail
+   the run, and it noted the same gap for a throwing `filter()` test function. Claude proposed posting the re-review,
+   fixing both lines, resolving the last conversation and merging.
+
+   > do it
+
 ## Interpretation
 
 Move `src/` into the layout CLAUDE.md describes, with no behavior changes:
