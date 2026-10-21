@@ -36,20 +36,20 @@ Out: other export types such as JSON Lines or sitemaps, and updating `osmotic-pl
 
 ## Acceptance criteria
 
-- [ ] `.export()` with an unknown type throws when the chain is built, and the message says to load a plugin.
-- [ ] The exporter is created on the first row of a run, with the `file` and `options` given to `.export()`.
-- [ ] A run without rows creates no exporter, and the summary says so.
-- [ ] `write()` is called once per row with its data, and a promise it returns is awaited before the branch continues.
-- [ ] `end()` is called once per run, also when a step fails.
-- [ ] An `end()` that fails fails the run and is reported by the `end` event; after an earlier failure, the earlier
+- [x] `.export()` with an unknown type throws when the chain is built, and the message says to load a plugin.
+- [x] The exporter is created on the first row of a run, with the `file` and `options` given to `.export()`.
+- [x] A run without rows creates no exporter, and the summary says so.
+- [x] `write()` is called once per row with its data, and a promise it returns is awaited before the branch continues.
+- [x] `end()` is called once per run, also when a step fails.
+- [x] An `end()` that fails fails the run and is reported by the `end` event; after an earlier failure, the earlier
       error is kept and the close error is logged.
-- [ ] `stats.rows` maps each export file to its row count, and each run gets a fresh exporter and count.
-- [ ] `Osmotic.exporter()` throws for a type that already exists.
-- [ ] Plugins register export types through `exporters`; a type that is taken throws and loads nothing from the list;
+- [x] `stats.rows` maps each export file to its row count, and each run gets a fresh exporter and count.
+- [x] `Osmotic.exporter()` throws for a type that already exists.
+- [x] Plugins register export types through `exporters`; a type that is taken throws and loads nothing from the list;
       `exporters` that isn't an object of functions is rejected.
-- [ ] Options of a type declared in `ExportTypes` are type-checked; undeclared types take any object.
-- [ ] `.csv()` and `CsvOptions` are gone.
-- [ ] `osmotic-plugin-csv` writes CSV through `.export('csv', …)` with the former options, tested in its own repo.
+- [x] Options of a type declared in `ExportTypes` are type-checked; undeclared types take any object.
+- [x] `.csv()` and `CsvOptions` are gone.
+- [x] `osmotic-plugin-csv` writes CSV through `.export('csv', …)` with the former options, tested in its own repo.
 
 ## Affected public API
 
@@ -74,10 +74,23 @@ Out: other export types such as JSON Lines or sitemaps, and updating `osmotic-pl
 - The type is a separate argument, not read from the file extension, so a plugin can provide a format under its own
   type name and file names are free.
 - The exporter is created lazily on the first row, so runs without rows create no files, as `.csv()` did.
+- Arrays passed the plugin object checks, so `exporters: [fn]` registered a type named `"0"`, as `commands: [fn]`
+  registered a command (found by the tests on master, marked todo there). Both go through `checkFactories()`, which is
+  new on this branch, so the fix belongs here; it also removes the todo. Added to the CHANGELOG under Fixed.
 - The tests were written after the code, against this plan's criteria, because the code came before the test-first rule.
   To check that they test something, some of the code was broken on purpose and the matching tests were seen to fail.
 
 ## Verification
+
+`npm test` passes: 100 tests, none todo, and the type tests in `test-d/export.ts`. `test/export.ts` covers the criteria
+on creating, writing, closing and counting; `test/plugins.ts` the plugin ones; `test-d/export.ts` the options types.
+Searching `src/`, `examples/`, the README and the tests finds no `.csv(`, `CsvSink` or `CsvOptions` left, apart from
+the `ExportTypes` doc comment showing how a plugin declares its options. `osmotic-plugin-csv` passes its 6 tests
+against this branch.
+
+To check that tests written after the code still test it, each of these was broken in turn, and at least one test
+failed every time: the unknown-type error, creating a fresh exporter per run, awaiting `write()`, failing the run on
+close errors, passing options, registering plugin exporters, and the type clash check.
 
 ## Follow-ups
 

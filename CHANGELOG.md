@@ -39,6 +39,10 @@ Osmotic.get(url) /* ... */
 
 - `stats.rows` in the `end` event maps each export file to its row count.
 
+### Fixed
+
+- `Osmotic.plugins()` rejects a plugin whose `commands` is an array. Before, `[fn]` registered a command named `0`.
+
 ## [2.1.0] - 2026-10-21
 
 ### Added
