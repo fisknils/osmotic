@@ -4,6 +4,14 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows
 [Semantic Versioning](https://semver.org/).
 
+## [2.0.1] - 2026-10-21
+
+### Fixed
+
+- Installing no longer triggers npm's `allow-scripts` warning. The build moved from the
+  `prepare` script to `prepublishOnly`, so the package has no install scripts. Run
+  `npm run build` after cloning the repository.
+
 ## [2.0.0] - 2026-10-21
 
 The package is renamed from `@fisknils/osmo` to `osmotic`.
