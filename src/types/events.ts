@@ -39,5 +39,10 @@ export interface OsmoticEvents {
 /** The name of a run event. */
 export type OsmoticEvent = keyof OsmoticEvents;
 
-/** A listener for event `E`. Handlers may be async. */
+/**
+ * A listener for event `E`. Handlers may be async.
+ *
+ * @typeParam E - The event name.
+ * @param payload - The event's payload, as described in {@link OsmoticEvents}.
+ */
 export type Handler<E extends OsmoticEvent> = (payload: OsmoticEvents[E]) => unknown;

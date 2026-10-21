@@ -7,6 +7,7 @@ export type Pseudos = NonNullable<CheerioOptions['pseudos']>;
 export interface SlotConfig {
 	/** Proxy URL for this slot's requests. */
 	proxy?: string;
+	/** `User-Agent` header for this slot's requests. */
 	userAgent?: string;
 	/** Milliseconds to wait before each of this slot's requests. */
 	delay?: number;

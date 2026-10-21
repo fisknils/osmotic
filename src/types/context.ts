@@ -21,14 +21,25 @@ export interface Page {
 
 /** State passed along the chain. The page fields are present once a page is loaded. */
 export interface Context extends Partial<Page> {
+	/** The fields collected so far on this branch, starting as `{}`. */
 	data: Data;
 }
 
-/** Continues the chain with the given context. */
+/**
+ * Continues the chain with the given context.
+ *
+ * @param ctx - The context for the rest of the chain; pass a new object to change it.
+ * @returns A promise that settles when every branch below has finished.
+ */
 export type Next = (ctx: Context) => Promise<void>;
 
 /**
  * A chain step. Call `next(ctx)` zero times to stop the branch, once to continue,
  * or several times to branch.
+ *
+ * @param ctx - The context: collected `data`, and the current page once one is loaded.
+ * @param next - Continues the chain with a context.
+ * @returns A promise that settles when the step and its branches are done; return
+ * `next()`'s promise rather than awaiting it, so the page isn't kept alive meanwhile.
  */
 export type Step = (ctx: Context, next: Next) => Promise<void>;

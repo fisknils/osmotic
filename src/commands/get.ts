@@ -2,7 +2,13 @@ import type { CommandHost } from '../core/command-host.js';
 import { withoutPage } from '../core/page.js';
 import type { Step } from '../types/context.js';
 
-// Load url, resolved against the current page if there is one
+/**
+ * Builds the step of {@link Osmotic.get}: load `url` and continue the chain on it.
+ *
+ * @param host - The instance the step is added to.
+ * @param url - The URL to load; a relative one resolves against the current page.
+ * @returns The step.
+ */
 export function getStep(host: CommandHost, url: string): Step {
 	const priority = host.priority();
 	return (ctx, next) => {

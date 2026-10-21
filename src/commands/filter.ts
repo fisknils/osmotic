@@ -3,7 +3,13 @@ import type { FilterTest } from '../types/commands.js';
 import type { Step } from '../types/context.js';
 import { normalizeSelector } from '../utils/normalize-selector.js';
 
-// Continue only if test passes: a selector when the node contains a match, a function when it returns true
+/**
+ * Builds the step of {@link Osmotic.filter}: continue only if `test` passes.
+ *
+ * @param test - A selector that must match inside the current node, or a function that
+ * must return or resolve to a truthy value.
+ * @returns The step.
+ */
 export function filterStep(test: FilterTest): Step {
 	return (ctx, next) => {
 		const { $, node } = pageOf(ctx);
