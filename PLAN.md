@@ -46,12 +46,12 @@ Patch (3.1.0 → 3.1.1)
 
 ## Acceptance criteria
 
-- [ ] A command named after each former private field (`steps`, `exports`, `fetchMiddleware`, `events`, `state`,
+- [x] A command named after each former private field (`steps`, `exports`, `fetchMiddleware`, `events`, `state`,
       `pluginFetch`) registers with `Osmotic.command()` and works when called in a chain. (test/extend.ts)
-- [ ] `Osmotic.command('opts', …)` throws "already exists". (test/extend.ts)
-- [ ] A plugin with an `opts` command is rejected with "already exists", and nothing in its list is loaded.
+- [x] `Osmotic.command('opts', …)` throws "already exists". (test/extend.ts)
+- [x] A plugin with an `opts` command is rejected with "already exists", and nothing in its list is loaded.
       (test/plugins.ts)
-- [ ] Chains run as before: the existing tests pass unchanged.
+- [x] Chains run as before: the existing tests pass unchanged.
 
 ## Affected public API
 
@@ -68,6 +68,19 @@ Patch (3.1.0 → 3.1.1)
 
 ## Decisions
 
+- The name check creates an instance and looks at its own properties, rather than listing `opts` by name, so a
+  public field added later is covered without updating the check. Creating an instance only builds its empty state and
+  registers plugin hooks on its own emitter, so it has no side effects.
+- The README now says which names are taken, since it said nothing about it before.
+
 ## Verification
 
+- The three new tests were committed before the fix and failed against it: the six commands named after fields were
+  "not a function", and `opts` registered without an error, directly and through a plugin. `tsc` also rejected the
+  test file, since the interface merge clashed with the private fields.
+- With the fix, `npm test` passes, 119 tests, with the existing ones unchanged.
+- The emitted `dist/core/Osmotic.d.ts` shows `#private` instead of the six private field declarations.
+
 ## Follow-ups
+
+- Publish 3.1.1 after merging.
