@@ -15,7 +15,8 @@ import type { ExportOptions } from '../types/exporters.js';
  * @param file - The file to write.
  * @param options - Passed to the exporter.
  * @returns The step.
- * @throws If no exporter for `type` is loaded, when the command is called.
+ * @throws If no exporter for `type` is loaded, when the command is called. When the step
+ * runs, what the exporter's factory or `write()` throws; the run then fails.
  */
 export function exportStep<T extends string>(
 	host: CommandHost,

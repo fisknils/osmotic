@@ -10,7 +10,8 @@ import { normalizeSelector } from '../utils/normalize-selector.js';
  * @param test - A selector that must match inside the current node, or a function that
  * must return or resolve to a truthy value.
  * @returns The step.
- * @throws When the step runs before a page is loaded, or with an invalid selector.
+ * @throws When the step runs before a page is loaded, with an invalid selector, or with
+ * what a test function throws or rejects with.
  */
 export function filterStep(test: FilterTest): Step {
 	return (ctx, next) => {

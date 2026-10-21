@@ -362,8 +362,8 @@ export class Osmotic {
 	 * @param test - A selector, which passes when the current node contains a match, or
 	 * a function `($, node, data)`, which passes when it returns or resolves to a truthy
 	 * value.
-	 * @throws When the step runs before a page is loaded, or with an invalid selector; the
-	 * run then fails.
+	 * @throws When the step runs before a page is loaded, with an invalid selector, or with
+	 * what a test function throws or rejects with; the run then fails.
 	 *
 	 * @example
 	 * ```ts
