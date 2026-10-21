@@ -91,8 +91,8 @@ git worktree remove <scratch>/review-<n> && git branch -D review/<n>
 - `CHANGELOG.md` describes the change for users, with migration steps for breaking changes.
 - The README matches the new behavior.
 - New files are where the project structure in CLAUDE.md says they belong.
-- Before merging, `PLAN.md` must be removed in a final commit. If it's still there, that's a finding for later, not a
-  blocker while the branch is in progress.
+- `PLAN.md` is removed in a final commit right before merging, so expect it on the branch. Its presence isn't a
+  finding and doesn't affect the verdict.
 
 ### Style
 
