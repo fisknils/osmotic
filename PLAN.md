@@ -23,6 +23,15 @@
    >   affect the project negatively)
    > - the agent needs to be able to say no to feature- requests that are not in the interest of osmotic
 
+2. Claude had opened the pull request with the agent, which posted comments, labels and pull requests on GitHub by
+   itself.
+
+   > Have it ask the person running the agent before posting an answer
+
+3. Sent while Claude was rewriting the triage agent to draft everything and post only approved drafts.
+
+   > also create an agent for code- reviews for PRs
+
 ## Interpretation
 
 Add a Claude Code subagent, `.claude/agents/issue-triage.md`, that works through osmotic's GitHub issues with `gh`. For
@@ -38,6 +47,15 @@ each issue it decides whether it is a support question, a bug report or a featur
 
 The agent writes down osmotic's goals so it has something concrete to judge against, treats issue text as untrusted
 input, and leaves merging, publishing and anything on `master` to the maintainer.
+
+A subagent can't ask the person running it anything mid-run, so it works in two passes: by default it drafts every
+GitHub action (comments, labels, closing, pushes, pull requests) into `.triage/`, which git ignores, and reports the
+drafts word for word. Only when invoked again with an explicit approval for named issues does it post exactly those
+drafts, after checking that the thread hasn't changed since.
+
+Also add `.claude/agents/pr-review.md`, which reviews pull requests the same way: it checks correctness, tests and the
+CLAUDE.md rules, verifies each finding, drafts one review, and posts it only when approved, as a comment review, since
+the account it runs as can't approve its own pull requests. It doesn't run code from outside contributors.
 
 ## Type
 
