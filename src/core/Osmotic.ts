@@ -76,8 +76,9 @@ export class Osmotic {
 	private state: RunState | null = null;
 	// Middleware from plugins loaded before this chain was created; runs after fetchMiddleware
 	private readonly pluginFetch: FetchMiddleware[] = [...pluginMiddleware];
-	// What the built-in commands in src/commands/ reach of this instance
-	private readonly host: CommandHost = {
+	// What the built-in commands in src/commands/ reach of this instance. An ES private field
+	// isn't a property, so it can't hide a command a plugin registers as `host` (see #16)
+	readonly #host: CommandHost = {
 		opts: this.opts,
 		priority: () => this.steps.length,
 		visit: (url, from, next, priority) => this.visit(url, from, next, priority),
@@ -87,7 +88,8 @@ export class Osmotic {
 
 	/**
 	 * Create an empty chain. The fetch middleware of plugins loaded so far is added to it;
-	 * plugins loaded later don't reach it, so load plugins first.
+	 * the middleware of plugins loaded later isn't, so load plugins first. Their commands
+	 * and export types work on every instance, whenever they're loaded.
 	 *
 	 * @example
 	 * ```ts
@@ -102,10 +104,12 @@ export class Osmotic {
 	 * Start a new chain by loading `url`. Shorthand for `new Osmotic().get(url)`.
 	 *
 	 * @param url - The absolute URL of the first page.
+	 * @throws When the chain runs, if `url` isn't an absolute URL (`TypeError: Invalid
+	 * URL`); the run then fails.
 	 *
 	 * @example
 	 * ```ts
-	 * await Osmotic.get('https://example.com').set({ title: 'h1' }).data(console.log).run();
+	 * await Osmotic.get('https://example.com').set({ title: 'h1' }).data((row) => console.log(row)).run();
 	 * ```
 	 */
 	static get(url: string): Osmotic {
@@ -129,8 +133,9 @@ export class Osmotic {
 	}
 
 	/**
-	 * Append a step to the chain. Same as {@link Osmotic.use}; custom commands call it
-	 * through `this.add()`.
+	 * Append a step to the chain. Same as {@link Osmotic.use}. Commands registered with
+	 * {@link Osmotic.command} are added with it: their factory returns the step instead of
+	 * calling `add()`.
 	 *
 	 * @param step - The step to run after the steps added so far.
 	 *
@@ -272,9 +277,14 @@ export class Osmotic {
 	 *
 	 * @example
 	 * ```ts
+	 * import fs from 'node:fs';
+	 *
 	 * Osmotic.exporter('json-lines', (file) => {
 	 * 	const out = fs.createWriteStream(file);
-	 * 	return { write: (row) => out.write(JSON.stringify(row) + '\n'), end: () => out.end() };
+	 * 	return {
+	 * 		write: (row) => out.write(JSON.stringify(row) + '\n'),
+	 * 		end: () => new Promise((resolve) => out.end(resolve)),
+	 * 	};
 	 * });
 	 * ```
 	 */
@@ -315,8 +325,9 @@ export class Osmotic {
 	 * the previous page doesn't. Each URL is fetched at most once per run.
 	 *
 	 * @param url - The URL to load. A relative URL resolves against the current page's
-	 * `<base href>` or URL, so it needs a page loaded before this step; otherwise the
-	 * run fails with an invalid URL error.
+	 * `<base href>` or URL, so it needs a page loaded before this step.
+	 * @throws When the step runs with a relative URL and no page loaded, or a malformed URL
+	 * (`TypeError: Invalid URL`); the run then fails.
 	 *
 	 * @example
 	 * ```ts
@@ -324,7 +335,7 @@ export class Osmotic {
 	 * ```
 	 */
 	get(url: string): this {
-		return this.add(getStep(this.host, url));
+		return this.add(getStep(this.#host, url));
 	}
 
 	/**
@@ -333,7 +344,8 @@ export class Osmotic {
 	 *
 	 * @param selector - A CSS selector, with the selector extras: XPath-style indexes
 	 * (`span[2]`), `:text-is("…")`, `:text-match("…")` and the `pseudos` option.
-	 * @throws When the step runs before a page is loaded; the run then fails.
+	 * @throws When the step runs before a page is loaded, or with an invalid selector; the
+	 * run then fails.
 	 *
 	 * @example
 	 * ```ts
@@ -350,7 +362,8 @@ export class Osmotic {
 	 * @param test - A selector, which passes when the current node contains a match, or
 	 * a function `($, node, data)`, which passes when it returns or resolves to a truthy
 	 * value.
-	 * @throws When the step runs before a page is loaded; the run then fails.
+	 * @throws When the step runs before a page is loaded, or with an invalid selector; the
+	 * run then fails.
 	 *
 	 * @example
 	 * ```ts
@@ -369,8 +382,8 @@ export class Osmotic {
 	 * @param fields - The fields to extract, each a {@link Spec}: text, an attribute, an
 	 * array of matches, a list of objects or a nested object. With the `resolveUrls`
 	 * option on, URL attributes come back absolute.
-	 * @throws When the step runs before a page is loaded, or a spec is malformed; the run
-	 * then fails.
+	 * @throws When the step runs before a page is loaded, or a spec is malformed or has an
+	 * invalid selector; the run then fails.
 	 *
 	 * @example
 	 * ```ts
@@ -383,7 +396,7 @@ export class Osmotic {
 	 * ```
 	 */
 	set(fields: Record<string, Spec>): this {
-		return this.add(setStep(this.host, fields));
+		return this.add(setStep(this.#host, fields));
 	}
 
 	/**
@@ -393,7 +406,8 @@ export class Osmotic {
 	 *
 	 * @param spec - Where to find the links: `"selector@attr"`, relative to the current
 	 * node. Without `@attr` it reads `href`. Defaults to `'a@href'`.
-	 * @throws When the step runs before a page is loaded; the run then fails.
+	 * @throws When the step runs before a page is loaded, or with an invalid selector; the
+	 * run then fails.
 	 *
 	 * @example
 	 * ```ts
@@ -401,7 +415,7 @@ export class Osmotic {
 	 * ```
 	 */
 	follow(spec = 'a@href'): this {
-		return this.add(followStep(this.host, spec));
+		return this.add(followStep(this.#host, spec));
 	}
 
 	/**
@@ -414,7 +428,8 @@ export class Osmotic {
 	 * @param options - `sameDomain` (only links to the current page's hostname, default
 	 * `true`) and `exclude` (skip links whose pathname matches one of these regexes,
 	 * default `[]`).
-	 * @throws When the step runs before a page is loaded; the run then fails.
+	 * @throws When the step runs before a page is loaded, or with an invalid selector; the
+	 * run then fails.
 	 *
 	 * @example
 	 * ```ts
@@ -424,7 +439,7 @@ export class Osmotic {
 	 * ```
 	 */
 	recurse(spec = 'a@href', options: RecurseOptions = {}): this {
-		return this.add(recurseStep(this.host, spec, options));
+		return this.add(recurseStep(this.#host, spec, options));
 	}
 
 	/**
@@ -470,7 +485,8 @@ export class Osmotic {
 	 * @param file - The file to write. What happens to an existing file depends on the
 	 * exporter.
 	 * @param options - Passed to the exporter; what it accepts depends on the type.
-	 * @throws If no exporter for `type` is loaded.
+	 * @throws If no exporter for `type` is loaded, when the chain is built. An error from the
+	 * exporter fails the run.
 	 *
 	 * @example
 	 * ```ts
@@ -478,7 +494,7 @@ export class Osmotic {
 	 * ```
 	 */
 	export<T extends string>(type: T, file: string, options?: ExportOptions<T>): this {
-		return this.add(exportStep(this.host, type, file, options));
+		return this.add(exportStep(this.#host, type, file, options));
 	}
 
 	// --- Helpers for custom commands -------------------------------------------
@@ -512,7 +528,7 @@ export class Osmotic {
 	 *
 	 * @param url - The absolute URL to fetch.
 	 * @param priority - Requests with a higher priority get the next free slot first.
-	 * Built-in steps use their position in the chain.
+	 * Built-in steps use their position in the chain. Defaults to `0`.
 	 * @returns The page, or `null` if the URL was already seen, is disallowed, exceeds
 	 * `maxPages`, fails, or isn't HTML.
 	 * @throws If called outside {@link Osmotic.run}.
@@ -570,9 +586,10 @@ export class Osmotic {
 	 * Run the chain. Resolves once every branch has finished. A chain can be run again;
 	 * each run starts with no pages seen and fresh exports.
 	 *
-	 * Exporters are closed and `end` handlers run even if the run fails. After a
-	 * successful run it logs a short summary to the console: the number of pages
-	 * fetched, and of URLs skipped because of `robots.txt`.
+	 * Exporters are closed and `end` handlers run even if the run fails. After every run it
+	 * logs a line per export to the console, with the rows written. After a successful run
+	 * it also logs the number of pages fetched and, if any, of URLs skipped because of
+	 * `robots.txt`.
 	 *
 	 * @throws What a step, `start` handler or exporter threw.
 	 *
