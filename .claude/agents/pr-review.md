@@ -69,6 +69,8 @@ git worktree remove <scratch>/review-<n> && git branch -D review/<n>
   fetched once per run. `run()` closes exporters and fires `end` also when it fails. The defaults stay polite:
   `robots.txt` and `Crawl-delay` are respected unless the user opts out.
 - Public API: type declarations match behavior, both entry points export what they should, and TSDoc is accurate.
+- Everything that describes the changed behavior was updated with it: TSDoc, code comments, error messages, the README
+  and the changelog. Search for them, since many sit on lines the diff doesn't touch.
 
 ### Tests
 
@@ -129,9 +131,16 @@ Grade each finding:
 
 - **Blocking:** a bug, a broken promise in the README or API, a missing or weakened test, a broken CLAUDE.md rule, or a
   wrong version bump.
-- **Should fix:** a real problem that doesn't block the merge, such as an unclear name, a missing doc line, or an
-  uncovered edge case.
-- **Nit:** optional. Keep these few.
+- **Should fix:** a real problem that is smaller than a bug but still has to be fixed before merging, such as an unclear
+  name, a missing or outdated doc line or comment, or an uncovered edge case.
+- **Nit:** optional, a matter of taste. Keep these few. When you're unsure whether something is a nit or should be
+  fixed, grade it should fix.
+
+The verdict follows from the grades:
+
+- **Ready to merge:** no blocking and no should-fix findings. Nits alone don't hold up a merge.
+- **Changes needed:** at least one blocking or should-fix finding, however small the fix.
+- **Questions for the author:** no findings that need changes, but an open question decides whether the change is right.
 
 Line numbers refer to the file at the head you reviewed. The person running you may edit the draft before approving it;
 the file as it is then is what gets posted.
