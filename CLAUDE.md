@@ -194,3 +194,17 @@ TypeScript config is layered:
 `npm run build` compiles with `tsconfig.dist.json`. `npm test` builds, type-checks `test/` and `test-d/`, and then runs `test/*.ts`. The `files` field in `package.json` publishes `dist`, and `main`, `types` and `exports` point into it.
 
 When you add a file, put it where this layout says it belongs. Moving existing files into this layout is a refactor of its own, on its own branch, with no behavior changes.
+
+## Documentation comments
+
+Editor tooltips are the documentation most users read, so everything the entry points export has complete TSDoc, and so do the step functions in `src/commands/` and `CommandHost`:
+
+- A summary that says what it does and anything surprising about it, such as what it carries over, what it skips and when it fails.
+- `@param` for every parameter, also when the name seems obvious. Put a parameter's default in its `@param` text ("Defaults to `'a@href'`."); `@defaultValue` is for properties.
+- `@typeParam` for every type parameter.
+- `@returns` when a function returns a value, but not on chainable methods that return `this`.
+- `@throws` for every error it throws, and when: while the chain is built, or when the step runs and fails the run.
+- `@example` on every public method, and the examples follow the advice of the docs around them (for example, steps return `next()`'s promise rather than awaiting it).
+- Interface members and type properties get a one-line summary at least, and `@defaultValue` where they have a default.
+
+Internal code outside `src/commands/` keeps short `//` comments.

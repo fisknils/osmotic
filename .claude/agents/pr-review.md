@@ -68,7 +68,7 @@ git worktree remove <scratch>/review-<n> && git branch -D review/<n>
   promise instead of awaiting it, so a page's DOM isn't kept alive (see the comment in `src/core/page.ts`). Each URL is
   fetched once per run. `run()` closes exporters and fires `end` also when it fails. The defaults stay polite:
   `robots.txt` and `Crawl-delay` are respected unless the user opts out.
-- Public API: type declarations match behavior, both entry points export what they should, and TSDoc is accurate.
+- Public API: type declarations match behavior, both entry points export what they should, and TSDoc is complete and accurate, following "Documentation comments" in CLAUDE.md.
 - Everything that describes the changed behavior was updated with it: TSDoc, code comments, error messages, the README
   and the changelog. Search for them, since many sit on lines the diff doesn't touch.
 
