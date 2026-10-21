@@ -14,7 +14,15 @@ Every branch has a `PLAN.md` in the repository root, written before any code. Ke
 
 ## Prompts
 
-Every prompt that shaped this branch, verbatim, in order. Append new ones as they arrive.
+Every prompt that shaped this branch, in order. Append new ones as they arrive. A prompt alone often makes no sense
+("ok", "yes, do that"), so start each with a short note on what it responds to: the question, suggestion or result it
+reacts to, or the state of the work when it came in. Then quote the prompt verbatim. A reader of the plan or the pull
+request should understand each prompt without the conversation.
+
+1. Claude explained that authors can't approve their own pull requests, proposed required status checks instead, and
+   asked whether to set them up.
+
+   > ok
 
 ## Interpretation
 
