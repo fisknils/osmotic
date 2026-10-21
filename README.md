@@ -8,15 +8,15 @@ are plain CSS with a few additions.
 Inspired by [node-osmosis](https://github.com/rchipka/node-osmosis).
 
 ```js
-const { Osmotic } = require("osmotic");
+const { Osmotic } = require('osmotic');
 
 Osmotic.get('https://news.ycombinator.com')
-  .recurse('a[rel="next"]@href')
-  .find('tr.athing')
-  .set({ rank: '.rank', title: '.titleline > a', link: '.titleline > a@href' })
-  .csv('hacker-news.csv')
-  .config({maxPages: 20})
-  .run();
+	.recurse('a[rel="next"]@href')
+	.find('tr.athing')
+	.set({ rank: '.rank', title: '.titleline > a', link: '.titleline > a@href' })
+	.csv('hacker-news.csv')
+	.config({ maxPages: 20 })
+	.run();
 ```
 
 - Fluent chain API, with branching built in: `find()` and `follow()` continue once per match
@@ -51,13 +51,13 @@ import { Osmotic } from 'osmotic';
 Each command adds a step. When you call `run()`, a context object flows through the
 steps in order:
 
-| Field  | Meaning                                                  |
-| ------ | -------------------------------------------------------- |
-| `data` | Fields collected so far (starts as `{}`)                 |
-| `$`    | The cheerio instance for the current page                |
+| Field  | Meaning                                                          |
+| ------ | ---------------------------------------------------------------- |
+| `data` | Fields collected so far (starts as `{}`)                         |
+| `$`    | The cheerio instance for the current page                        |
 | `node` | The current element (the document root right after a page loads) |
-| `url`  | The current page URL (after redirects)                   |
-| `base` | Base for relative links: `<base href>` if present, else `url` |
+| `url`  | The current page URL (after redirects)                           |
+| `base` | Base for relative links: `<base href>` if present, else `url`    |
 
 A step can stop the branch, continue it, or split it. For example, `find("li")`
 continues once per `<li>`, so every step after it runs once per list item, and the
@@ -89,10 +89,10 @@ value is a [spec](#extraction-specs).
 
 ```js
 .set({
-  title: 'h1',
-  image: 'meta[property="og:image"]@content',
-  tags: ['.tag'],
-  price: { amount: '.price .value', currency: '.price .currency' },
+	title: 'h1',
+	image: 'meta[property="og:image"]@content',
+	tags: ['.tag'],
+	price: { amount: '.price .value', currency: '.price .currency' },
 })
 ```
 
@@ -105,7 +105,7 @@ Continues only if `test` passes:
 
 ```js
 const isProductPage = ($) =>
-  $('script[type="application/ld+json"]').text().includes('"Product"');
+	$('script[type="application/ld+json"]').text().includes('"Product"');
 
 .filter(isProductPage)
 ```
@@ -127,12 +127,12 @@ crawls a whole site.
 
 ```js
 Osmotic.get('https://example.com/')
-  .recurse('a:not([rel~="nofollow"])@href', { exclude: [/^\/checkout\//] })
-  .filter(isProductPage)
-  .set({ title: 'h1' })
-  .csv("products.csv")
-  .config({ maxPages: 500 })
-  .run();
+	.recurse('a:not([rel~="nofollow"])@href', { exclude: [/^\/checkout\//] })
+	.filter(isProductPage)
+	.set({ title: 'h1' })
+	.csv('products.csv')
+	.config({ maxPages: 500 })
+	.run();
 ```
 
 ### `.tap(label = "tap")`
@@ -172,15 +172,15 @@ to the console.
 
 Specs are used by `set()`, and the string form by `follow()` and `recurse()`.
 
-| Spec                   | Result                                                  |
-| ---------------------- | ------------------------------------------------------- |
-| `"selector"`           | Trimmed text of the first match                         |
-| `"selector@attr"`      | Attribute of the first match                            |
-| `"@attr"`              | Attribute of the current node itself                    |
-| `""`                   | Text of the current node itself                         |
-| `["selector"]`         | Array of the text of every match                        |
-| `["selector@attr"]`    | Array of the attribute of every match (missing attributes skipped) |
-| `{ key: spec, ... }`   | Nested object, each spec resolved relative to the node  |
+| Spec                 | Result                                                             |
+| -------------------- | ------------------------------------------------------------------ |
+| `"selector"`         | Trimmed text of the first match                                    |
+| `"selector@attr"`    | Attribute of the first match                                       |
+| `"@attr"`            | Attribute of the current node itself                               |
+| `""`                 | Text of the current node itself                                    |
+| `["selector"]`       | Array of the text of every match                                   |
+| `["selector@attr"]`  | Array of the attribute of every match (missing attributes skipped) |
+| `{ key: spec, ... }` | Nested object, each spec resolved relative to the node             |
 
 With `resolveUrls` on (the default), URL attributes come back absolute:
 `href`, `src`, `action`, `formaction`, `poster`, `cite`, `background`, `longdesc`
@@ -212,19 +212,19 @@ selector alias or a function `(element, argument) => boolean`:
 
 ## Options
 
-| Option              | Default         | Description |
-| ------------------- | --------------- | ----------- |
-| `concurrency`       | `4`             | Maximum parallel requests. Ignored when `slots` is set. |
-| `maxPages`          | `100`           | Maximum number of fetch attempts per run. |
-| `delay`             | `0`             | Milliseconds to wait before each request. |
-| `userAgent`         | `"osmotic/0.1"` | `User-Agent` header. |
-| `headers`           | `{}`            | Extra headers for every request. |
-| `slots`             | `null`          | Per-slot settings, see below. |
-| `respectRobots`     | `true`          | Skip URLs disallowed by the site's `robots.txt`. |
+| Option              | Default         | Description                                                      |
+| ------------------- | --------------- | ---------------------------------------------------------------- |
+| `concurrency`       | `4`             | Maximum parallel requests. Ignored when `slots` is set.          |
+| `maxPages`          | `100`           | Maximum number of fetch attempts per run.                        |
+| `delay`             | `0`             | Milliseconds to wait before each request.                        |
+| `userAgent`         | `"osmotic/0.1"` | `User-Agent` header.                                             |
+| `headers`           | `{}`            | Extra headers for every request.                                 |
+| `slots`             | `null`          | Per-slot settings, see below.                                    |
+| `respectRobots`     | `true`          | Skip URLs disallowed by the site's `robots.txt`.                 |
 | `respectCrawlDelay` | `true`          | Space requests to a site by its `Crawl-delay`, across all slots. |
-| `robotsUserAgent`   | `null`          | User agent to match in `robots.txt`. Defaults to `userAgent`. |
-| `resolveUrls`       | `true`          | Return URL attributes from `set()` as absolute URLs. |
-| `pseudos`           | `{}`            | Custom selector pseudo-classes. |
+| `robotsUserAgent`   | `null`          | User agent to match in `robots.txt`. Defaults to `userAgent`.    |
+| `resolveUrls`       | `true`          | Return URL attributes from `set()` as absolute URLs.             |
+| `pseudos`           | `{}`            | Custom selector pseudo-classes.                                  |
 
 Only HTML responses with a 2xx status continue the chain. Other responses and
 network errors end that branch; network errors are also logged.
@@ -280,15 +280,17 @@ must return a `Response`, usually by calling `next(req)`. Middleware runs in the
 order it was added.
 
 ```js
-const retry = (times = 2) => async (req, next) => {
-  for (let attempt = 0; ; attempt++) {
-    const res = await next(req);
-    if ((res.status !== 429 && res.status < 500) || attempt >= times) return res;
-    await new Promise((r) => setTimeout(r, 1000 * 2 ** attempt));
-  }
-};
+const retry =
+	(times = 2) =>
+	async (req, next) => {
+		for (let attempt = 0; ; attempt++) {
+			const res = await next(req);
+			if ((res.status !== 429 && res.status < 500) || attempt >= times) return res;
+			await new Promise((r) => setTimeout(r, 1000 * 2 ** attempt));
+		}
+	};
 
-Osmotic.get("https://example.com").useFetch(retry(2)) /* ... */;
+Osmotic.get('https://example.com').useFetch(retry(2)) /* ... */;
 ```
 
 ### Reusable commands: `Osmotic.command(name, factory)`
@@ -301,18 +303,18 @@ helpers the built-in commands use.
 ```js
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-Osmotic.command("pause", (ms) => (ctx, next) => sleep(ms).then(() => next(ctx)));
+Osmotic.command('pause', (ms) => (ctx, next) => sleep(ms).then(() => next(ctx)));
 
-Osmotic.get("https://example.com").pause(500).find("a") /* ... */;
+Osmotic.get('https://example.com').pause(500).find('a') /* ... */;
 ```
 
 In TypeScript, declare the new method so the compiler knows about it:
 
 ```ts
 declare module 'osmotic' {
-  interface Osmotic {
-    pause(ms: number): this;
-  }
+	interface Osmotic {
+		pause(ms: number): this;
+	}
 }
 ```
 
@@ -332,18 +334,18 @@ npm run build   # clean dist/ and compile src/ with tsc
 npm run clean   # remove dist/
 ```
 
-| File               | Responsibility |
-| ------------------ | -------------- |
-| `src/osmotic.ts`      | The `Osmotic` class: commands, page fetching, running |
-| `src/extract.ts`   | Extraction specs and link collection |
-| `src/selectors.ts` | Selector extras (`[n]`, `:text-is`, `:text-match`) |
-| `src/urls.ts`      | URL resolution and `<base href>` handling |
-| `src/csv.ts`       | Streaming CSV writer |
-| `src/robots.ts`    | `robots.txt` cache and `Crawl-delay` scheduling |
-| `src/slots.ts`     | Request slot pool |
-| `src/http.ts`      | Fetch middleware chain and proxy support |
-| `src/types.ts`     | Shared types |
-| `src/index.cts` / `src/index.mts` | CommonJS and ESM entry points |
+| File                              | Responsibility                                        |
+| --------------------------------- | ----------------------------------------------------- |
+| `src/osmotic.ts`                  | The `Osmotic` class: commands, page fetching, running |
+| `src/extract.ts`                  | Extraction specs and link collection                  |
+| `src/selectors.ts`                | Selector extras (`[n]`, `:text-is`, `:text-match`)    |
+| `src/urls.ts`                     | URL resolution and `<base href>` handling             |
+| `src/csv.ts`                      | Streaming CSV writer                                  |
+| `src/robots.ts`                   | `robots.txt` cache and `Crawl-delay` scheduling       |
+| `src/slots.ts`                    | Request slot pool                                     |
+| `src/http.ts`                     | Fetch middleware chain and proxy support              |
+| `src/types.ts`                    | Shared types                                          |
+| `src/index.cts` / `src/index.mts` | CommonJS and ESM entry points                         |
 
 Examples are in [`examples/`](examples/).
 
