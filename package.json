@@ -3,7 +3,28 @@
 	"version": "3.0.0",
 	"description": "Chainable web scraper for Node.js: find, extract and follow with CSS selectors, respects robots.txt, exports results through plugins such as CSV",
 	"license": "ISC",
-	"author": "",
+	"author": {
+		"name": "fisknils",
+		"url": "https://github.com/fisknils"
+	},
+	"contributors": [
+		{
+			"name": "fisknils",
+			"url": "https://github.com/fisknils"
+		},
+		{
+			"name": "Claude",
+			"url": "https://claude.com/claude-code"
+		}
+	],
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/fisknils/osmotic.git"
+	},
+	"homepage": "https://github.com/fisknils/osmotic#readme",
+	"bugs": {
+		"url": "https://github.com/fisknils/osmotic/issues"
+	},
 	"type": "commonjs",
 	"main": "dist/index.cjs",
 	"files": [
