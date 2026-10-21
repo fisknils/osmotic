@@ -9,6 +9,13 @@
    > Also, add a rule to CLAUDE.md to push back on bad ideas, ideas that would not solve the issue, or ideas to solve an
    > issue that has a better approach
 
+2. A review of this pull request found that "If any answer is no" fits the first two questions but not the third ("Is
+   there a better approach?"), that the rule dropped the plan's "clearly" better, and that type Other plans may have no
+   Decisions section to record an objection under. The maintainer agreed with the findings.
+
+   > apply the suggested changes.
+   > reword the third question to Is this the right approach?
+
 ## Interpretation
 
 Add a rule to CLAUDE.md: before acting on a request, check that it is a good idea, that it would solve the problem it is

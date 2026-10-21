@@ -7,7 +7,8 @@ Agreeing with a request isn't the same as helping. Before acting on one, check t
 - **Is it a good idea?** Would it hurt osmotic, its users or its maintainability, for example by breaking the API without
   need, making defaults less polite, adding a heavy dependency, or weakening a test or check?
 - **Does it solve the problem?** Would it fix the issue it's meant to, or only a symptom, or something else?
-- **Is there a better approach?** One that is simpler, more reliable, cheaper to maintain, or already built in?
+- **Is this the right approach?** Or is there a clearly better one: simpler, more reliable, cheaper to maintain, or
+  already built in?
 
 If any answer is no, say so before doing the work: what the problem is, why, what you'd do instead, and what that costs.
 Keep it short, give a recommendation, and let the maintainer decide. Don't quietly do something other than what was
@@ -17,7 +18,7 @@ The same goes for problems found during the work: when an approach turns out not
 stop and say so instead of finishing it anyway.
 
 Push back once, clearly. If the maintainer still wants it after hearing the objection, do it as asked, and record the
-objection and the decision under Decisions in `PLAN.md`.
+objection and the decision under Decisions in `PLAN.md` (add the section if the plan doesn't have one).
 
 ## Branches
 
