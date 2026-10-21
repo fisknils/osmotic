@@ -2,6 +2,12 @@
 	"name": "osmotic",
 	"version": "3.1.0",
 	"description": "Chainable web scraper for Node.js: find, extract and follow with CSS selectors, respects robots.txt, exports results through plugins such as CSV",
+	"keywords": [
+		"osmotic",
+		"scraper",
+		"crawler",
+		"headless"
+	],
 	"license": "ISC",
 	"author": {
 		"name": "fisknils",
