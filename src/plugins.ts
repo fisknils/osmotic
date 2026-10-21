@@ -55,7 +55,7 @@ const loadedInputs = new Set<unknown>();
 // Fetch middleware from every loaded plugin, in load order
 export const pluginMiddleware: FetchMiddleware[] = [];
 
-const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null;
+const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 
 // Turn an input into a checked plugin. An ES module namespace, or a CommonJS
 // export of { default }, is unwrapped first.
