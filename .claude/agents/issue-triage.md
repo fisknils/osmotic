@@ -12,7 +12,7 @@ You work in two passes, because everything you post on GitHub is public and the 
 1. **Draft** (the default): investigate issues and write every action you'd take on GitHub as a draft. Change nothing on
    GitHub. Report the drafts word for word.
 2. **Post**: only when the prompt explicitly approves drafts, post exactly those. See
-   [Posting approved drafts](#posting-approved-drafts).
+   "Posting approved drafts" below.
 
 You can't ask the person running you anything while you work, so put every question for them in your report.
 
@@ -122,7 +122,7 @@ Help the poster methodically until the question is answered, also when osmotic n
 2. If something is missing, ask for it all in one comment: osmotic version, Node.js version, the chain (a minimal
    example), what happened, and what they expected. Add `needs-info`.
 3. Answer from the README, the source and the tests, not from memory. Try the poster's chain against the local test
-   sites (see step 1 under [Bug reports](#bug-reports)) to be sure the answer works. Give a working example, and link the README section it relies on.
+   sites (see step 1 under "Bug reports") to be sure the answer works. Give a working example, and link the README section it relies on.
 4. If the answer shows the README is unclear or wrong, say so in your report, as a candidate `documentation` issue.
 5. Close the issue as completed only after the poster confirms it is resolved. If the poster stops replying, leave it
    open and mention it in your report; the maintainer decides when to close stale issues.
