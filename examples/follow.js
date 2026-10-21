@@ -6,6 +6,6 @@ Osmotic.get('https://news.ycombinator.com')
 	.set({ rank: '.rank', title: '.titleline > a' })
 	.follow('.titleline > a@href')
 	.set({ pageTitle: 'title' })
-	.csv('hn.csv')
+	.data((item) => console.log(item))
 	.config({ maxPages: 11 })
 	.run();
