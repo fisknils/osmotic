@@ -36,6 +36,11 @@
 
    > do it
 
+5. Claude stopped mid-work after a second session, running in the same checkout, branched off this branch and picked
+   up its implementation commit. Claude asked whether to fix the branches or wait for the other session to finish.
+
+   > that was my bad. I had two sessions going at the same time. The other one is done now, so you may continue
+
 ## Interpretation
 
 Add a spec form `[selector, { key: spec }]`. It finds every match of `selector` relative to the current node and
@@ -62,13 +67,13 @@ Minor (3.0.0 → 3.1.0)
 
 ## Acceptance criteria
 
-- [ ] `[selector, { key: spec }]` returns one object per match, with each spec resolved relative to that match. (test/set.ts)
-- [ ] Two list specs in one `.set()` capture two groups from one page into one row, fetching the page once. (test/set.ts)
-- [ ] Values in the object can be any spec form: text, `@attr` (with URL resolution), string arrays and nested lists. (test/set.ts)
-- [ ] No matches gives `[]`. (test/set.ts)
-- [ ] An array spec that is neither `[string]` nor `[string, object]` still fails the run, with a message naming both
+- [x] `[selector, { key: spec }]` returns one object per match, with each spec resolved relative to that match. (test/set.ts)
+- [x] Two list specs in one `.set()` capture two groups from one page into one row, fetching the page once. (test/set.ts)
+- [x] Values in the object can be any spec form: text, `@attr` (with URL resolution), string arrays and nested lists. (test/set.ts)
+- [x] No matches gives `[]`. (test/set.ts)
+- [x] An array spec that is neither `[string]` nor `[string, object]` still fails the run, with a message naming both
       forms. (test/set.ts)
-- [ ] The `Spec` type accepts `[string, { key: spec }]` and still accepts `string[]`, and rejects a field object
+- [x] The `Spec` type accepts `[string, { key: spec }]` and still accepts `string[]`, and rejects a field object
       first or more than one field object. (test-d/set.ts)
 
 ## Affected public API
@@ -92,4 +97,14 @@ Minor (3.0.0 → 3.1.0)
 
 ## Verification
 
+- The tests in `test/set.ts` and `test-d/set.ts` were committed before the code. The runtime tests failed against the
+  old `pick()`, which threw on every two-element array, and `tsc -p tsconfig.test.json` rejected the new form in the
+  type tests. With the change, `npm test` passes (108 tests), and the `@ts-expect-error` lines still compile, so the
+  type still rejects those shapes.
+- All criteria are covered by automated tests; none was checked by hand only.
+
 ## Follow-ups
+
+- `osmotic-plugin-csv`: check how it writes a field that holds an array of objects, and document it or flatten it
+  there. This branch doesn't change what exporters receive (nested arrays were already possible), but list specs make
+  such rows common.
