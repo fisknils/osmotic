@@ -153,6 +153,24 @@ test('the fields of a list spec take every spec form', async (t) => {
 	]);
 });
 
+test('a list selector takes the selector extras', async (t) => {
+	const site = await openSite(t, shop);
+	const chain = Osmotic.get(site.url('/product/desk-lamp')).set({
+		colour: ['.specs tr[2]', { label: 'td[1]' }],
+		post: ['.shipping li:has(.method:text-is("Post"))', { cost: '.cost' }],
+	});
+	const { rows } = await scrape(chain);
+	assert.deepEqual(rows, [{ colour: [{ label: 'Colour' }], post: [{ cost: '49' }, { cost: '0' }] }]);
+});
+
+test('a list selector with @attr fails the run', async (t) => {
+	const site = await openSite(t, shop);
+	const chain = Osmotic.get(site.url('/product/desk-lamp')).set({
+		offers: ['.offer@class', { seller: '.seller' }],
+	});
+	await assert.rejects(chain.run(), /The selector of a list spec takes no @attr/);
+});
+
 test('a list spec without matches gives an empty array', async (t) => {
 	const site = await openSite(t, shop);
 	const chain = Osmotic.get(site.url('/product/usb-charger')).set({
