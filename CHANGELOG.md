@@ -10,7 +10,9 @@ All notable changes to this project are documented here. The format is based on
 
 - A command registered with `Osmotic.command()` or a plugin under the name of one of
   the chain's internal fields, such as `steps`, `state` or `events`, registered without
-  an error but couldn't be called. These names work as commands now.
+  an error but couldn't be called. These names work as commands now. The internal
+  fields, which were never part of the API, are no longer reachable as properties, so
+  JavaScript code that read `chain.steps` and the like gets `undefined` now.
 - A command named `opts` now throws "already exists" when it's registered, like a
   command named after a method. Before, it registered but couldn't be called.
 
