@@ -50,7 +50,7 @@ for (const command of ['follow', 'recurse'] as const) {
 	});
 }
 
-// osmotic copies attribute values (detach() in src/extract.ts), because V8 can keep a short
+// osmotic copies attribute values (detach() in src/utils/pick.ts), because V8 can keep a short
 // substring as a slice of the whole page. cheerio's current parser builds new strings, so this
 // guards the outcome rather than detach() itself.
 test("extracted values don't keep the pages' HTML alive", async (t) => {

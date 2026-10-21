@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { Osmotic, type FetchMiddleware } from '../src/index.cjs';
 import { news, openSite, scrape, shop, sortBy } from './helpers/index.js';
 
-declare module '../src/osmotic.js' {
+declare module '../src/core/Osmotic.js' {
 	interface Osmotic {
 		extendTestPause(ms: number): this;
 		extendTestFirstLink(): this;

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { Osmotic, type FetchMiddleware, type OsmoticPlugin } from '../src/index.cjs';
 import { openSite, scrape, shop } from './helpers/index.js';
 
-declare module '../src/osmotic.js' {
+declare module '../src/core/Osmotic.js' {
 	interface Osmotic {
 		pluginTestShout(): this;
 		pluginTestFactory(): this;

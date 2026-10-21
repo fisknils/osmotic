@@ -1,5 +1,5 @@
 import robotsParser from 'robots-parser';
-import { sleep } from './util.js';
+import { sleep } from '../utils/sleep.js';
 
 type Robots = ReturnType<typeof robotsParser>;
 

@@ -1,48 +1,34 @@
 import * as cheerio from 'cheerio';
-import type { CheerioAPI } from 'cheerio';
-import { Emitter, type Handler, type OsmoticEvent, type RunStats, type SkipReason } from './events.js';
-import { addExporter, exporterFor, ExportTarget, type ExporterFactory, type ExportOptions } from './exporters.js';
-import { links, pick } from './extract.js';
+import { dataStep } from '../commands/data.js';
+import { exportStep } from '../commands/export.js';
+import { filterStep } from '../commands/filter.js';
+import { findStep } from '../commands/find.js';
+import { followStep } from '../commands/follow.js';
+import { getStep } from '../commands/get.js';
+import { recurseStep } from '../commands/recurse.js';
+import { setStep } from '../commands/set.js';
+import { tapStep } from '../commands/tap.js';
+import type { FilterTest, RecurseOptions } from '../types/commands.js';
+import type { Context, Data, Next, Page, Step } from '../types/context.js';
+import type { Handler, OsmoticEvent, RunStats, SkipReason } from '../types/events.js';
+import type { ExporterFactory, ExportOptions } from '../types/exporters.js';
+import type { FetchMiddleware, FetchRequest } from '../types/fetch.js';
+import type { OsmoticOptions, Slot } from '../types/options.js';
+import type { PluginInput } from '../types/plugins.js';
+import type { Spec } from '../types/specs.js';
+import { collectLinks } from '../utils/collect-links.js';
+import { pageBase } from '../utils/page-base.js';
+import { builtinPseudos } from '../utils/pseudos.js';
+import { sleep } from '../utils/sleep.js';
+import type { CommandHost } from './command-host.js';
+import { Emitter } from './Emitter.js';
+import { addExporter } from './exporters.js';
+import type { ExportTarget } from './ExportTarget.js';
 import { fetchThrough } from './http.js';
-import { loadPlugins, pluginMiddleware, type PluginInput } from './plugins.js';
-import { RobotsCache } from './robots.js';
-import { builtinPseudos, normalizeSelector } from './selectors.js';
-import { SlotPool } from './slots.js';
-import { pageBase } from './urls.js';
-import { sleep } from './util.js';
-import type {
-	Context,
-	Data,
-	FetchMiddleware,
-	FetchRequest,
-	Next,
-	OsmoticOptions,
-	Page,
-	PageNode,
-	Slot,
-	Spec,
-	Step,
-} from './types.js';
-
-/**
- * The test for {@link Osmotic.filter}: a selector that passes when the current node
- * contains a match, or a function that passes when it returns true.
- */
-export type FilterTest = string | (($: CheerioAPI, node: PageNode, data: Data) => boolean | Promise<boolean>);
-
-/** Options for {@link Osmotic.recurse}. */
-export interface RecurseOptions {
-	/**
-	 * Only follow links to the current page's host.
-	 * @defaultValue `true`
-	 */
-	sameDomain?: boolean;
-	/**
-	 * Skip URLs whose pathname matches any of these.
-	 * @defaultValue `[]`
-	 */
-	exclude?: RegExp[];
-}
+import { pageOf } from './page.js';
+import { loadPlugins, pluginMiddleware } from './plugins.js';
+import { RobotsCache } from './RobotsCache.js';
+import { SlotPool } from './SlotPool.js';
 
 // State that lives for a single run()
 interface RunState {
@@ -53,26 +39,6 @@ interface RunState {
 	pages: number;
 	robotsSkipped: number;
 }
-
-// The page fields of ctx; throws when a step that needs a page runs before get()
-function pageOf(ctx: Context): Page & Context {
-	if (!ctx.$ || !ctx.node || !ctx.url) {
-		throw new Error('No page loaded yet; start the chain with get()');
-	}
-	return { ...ctx, base: ctx.base ?? ctx.url } as Page & Context;
-}
-
-// ctx without its page, to carry into pages loaded from it. Requests waiting for a
-// slot then hold only the collected data, not the parent page's DOM.
-function withoutPage({ $, node, url, base, ...rest }: Context): Context {
-	return rest;
-}
-
-const all = (branches: Promise<unknown>[]): Promise<void> => Promise.all(branches).then(() => undefined);
-
-// Built-in steps return next()'s promise instead of awaiting it. A suspended async
-// frame keeps ctx reachable, and with it the page's whole DOM, until every branch
-// below it has finished, which on a long crawl is most pages ever loaded.
 
 /**
  * A chainable scraper. Each command adds a step to the chain; {@link Osmotic.run}
@@ -110,6 +76,14 @@ export class Osmotic {
 	private state: RunState | null = null;
 	// Middleware from plugins loaded before this chain was created; runs after fetchMiddleware
 	private readonly pluginFetch: FetchMiddleware[] = [...pluginMiddleware];
+	// What the built-in commands in src/commands/ reach of this instance
+	private readonly host: CommandHost = {
+		opts: this.opts,
+		priority: () => this.steps.length,
+		visit: (url, from, next, priority) => this.visit(url, from, next, priority),
+		links: (ctx, spec) => this.links(ctx, spec),
+		addExport: (target) => void this.exports.push(target),
+	};
 
 	constructor() {
 		for (const mw of this.pluginFetch) this.addHooks(mw);
@@ -246,24 +220,16 @@ export class Osmotic {
 	}
 
 	// --- Commands -------------------------------------------------------------
+	// Each command's step is built in its own file in src/commands/.
 
 	/** Load a page. Relative URLs resolve against the current page. */
 	get(url: string): this {
-		const priority = this.steps.length;
-		return this.add((ctx, next) => {
-			const from = ctx.base ?? ctx.url;
-			const abs = from ? new URL(url, from).href : new URL(url).href;
-			return this.visit(abs, withoutPage(ctx), next, priority);
-		});
+		return this.add(getStep(this.host, url));
 	}
 
 	/** Continue the chain once per element matching `selector`. */
 	find(selector: string): this {
-		return this.add((ctx, next) => {
-			const { $, node } = pageOf(ctx);
-			const els = $(node).find(normalizeSelector(selector)).toArray();
-			return all(els.map((el) => next({ ...ctx, node: el })));
-		});
+		return this.add(findStep(selector));
 	}
 
 	/**
@@ -271,13 +237,7 @@ export class Osmotic {
 	 * a match, and a function `($, node, data)` passes when it returns true.
 	 */
 	filter(test: FilterTest): this {
-		return this.add((ctx, next) => {
-			const { $, node } = pageOf(ctx);
-			if (typeof test !== 'function') {
-				return $(node).find(normalizeSelector(test)).length > 0 ? next(ctx) : Promise.resolve();
-			}
-			return Promise.resolve(test($, node, ctx.data)).then((ok) => (ok ? next(ctx) : undefined));
-		});
+		return this.add(filterStep(test));
 	}
 
 	/**
@@ -289,55 +249,30 @@ export class Osmotic {
 	 * ```
 	 */
 	set(fields: Record<string, Spec>): this {
-		return this.add((ctx, next) => {
-			const { $, node, base } = pageOf(ctx);
-			const resolveBase = this.opts.resolveUrls ? base : null;
-			const values = Object.fromEntries(
-				Object.entries(fields).map(([key, spec]) => [key, pick($, node, spec, resolveBase)]),
-			);
-			return next({ ...ctx, data: { ...ctx.data, ...values } });
-		});
+		return this.add(setStep(this.host, fields));
 	}
 
 	/** Load every URL found by `spec`. Data collected so far carries over. */
 	follow(spec = 'a@href'): this {
-		const priority = this.steps.length;
-		return this.add((ctx, next) => {
-			const carry = withoutPage(ctx);
-			return all(this.links(ctx, spec).map((url) => this.visit(url, carry, next, priority)));
-		});
+		return this.add(followStep(this.host, spec));
 	}
 
 	/**
 	 * Run the rest of the chain on this page, then follow links found by `spec` and
 	 * repeat this step on each new page. Each URL is visited once per run.
 	 */
-	recurse(spec = 'a@href', { sameDomain = true, exclude = [] }: RecurseOptions = {}): this {
-		const priority = this.steps.length;
-		const step = (ctx: Context, next: Next): Promise<void> => {
-			const host = new URL(pageOf(ctx).url).hostname;
-			const children = this.links(ctx, spec).filter((url) => {
-				const u = new URL(url);
-				return (!sameDomain || u.hostname === host) && !exclude.some((re) => re.test(u.pathname));
-			});
-			const carry = withoutPage(ctx);
-			const again: Next = (child) => step(child, next);
-			return all([next(ctx), ...children.map((url) => this.visit(url, carry, again, priority))]);
-		};
-		return this.add(step);
+	recurse(spec = 'a@href', options: RecurseOptions = {}): this {
+		return this.add(recurseStep(this.host, spec, options));
 	}
 
 	/** Log `[label] url` for each branch reaching this step, then continue. */
 	tap(label = 'tap'): this {
-		return this.add((ctx, next) => {
-			console.log(`[${label}] ${ctx.url ?? '(no page)'}`);
-			return next(ctx);
-		});
+		return this.add(tapStep(label));
 	}
 
 	/** Call `cb` with the collected data, then continue. `cb` may be async. */
 	data(cb: (data: Data, ctx: Context) => unknown): this {
-		return this.add((ctx, next) => Promise.resolve(cb(ctx.data, ctx)).then(() => next(ctx)));
+		return this.add(dataStep(cb));
 	}
 
 	/**
@@ -354,10 +289,7 @@ export class Osmotic {
 	 * ```
 	 */
 	export<T extends string>(type: T, file: string, options?: ExportOptions<T>): this {
-		const factory = exporterFor(type);
-		const target = new ExportTarget(file, () => factory(file, options));
-		this.exports.push(target);
-		return this.add((ctx, next) => Promise.resolve(target.write(ctx.data)).then(() => next(ctx)));
+		return this.add(exportStep(this.host, type, file, options));
 	}
 
 	// --- Helpers for custom commands -------------------------------------------
@@ -368,7 +300,7 @@ export class Osmotic {
 	 */
 	links(ctx: Context, spec: string): string[] {
 		const { $, node, base } = pageOf(ctx);
-		return links($, node, spec, base);
+		return collectLinks($, node, spec, base);
 	}
 
 	/**

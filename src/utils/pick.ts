@@ -1,7 +1,8 @@
 import type { CheerioAPI } from 'cheerio';
-import { splitSpec } from './selectors.js';
-import { crawlableUrl, resolveAttr } from './urls.js';
-import type { Extracted, PageNode, Spec } from './types.js';
+import { splitSpec } from './split-spec.js';
+import { resolveAttr } from './resolve-attr.js';
+import type { PageNode } from '../types/context.js';
+import type { Extracted, Spec } from '../types/specs.js';
 
 // Copy of an attribute value that doesn't share memory with the page. V8 may store
 // a substring as a slice of the parser's input, so a short value kept in data
@@ -45,17 +46,4 @@ export function pick($: CheerioAPI, node: PageNode, spec: Spec, base: string | n
 	const [sel, attr] = splitSpec(spec);
 	const target = sel ? $(node).find(sel).first() : $(node);
 	return attr ? resolveAttr(attr, detach(target.attr(attr)), base) : target.text().trim();
-}
-
-// Unique absolute http(s) URLs found by spec ("selector@attr", attr defaults to href)
-export function links($: CheerioAPI, node: PageNode, spec: string, base: string): string[] {
-	const [sel, attr = 'href'] = splitSpec(spec);
-	const els = sel ? $(node).find(sel).toArray() : [node];
-	const urls = new Set<string>();
-	for (const el of els) {
-		const raw = $(el).attr(attr);
-		const url = raw && crawlableUrl(raw, base);
-		if (url) urls.add(url);
-	}
-	return [...urls];
 }
