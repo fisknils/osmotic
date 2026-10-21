@@ -1,9 +1,22 @@
 import { createWriteStream, type WriteStream } from 'node:fs';
 import type { Data } from './types.js';
 
+/**
+ * Options for `Osmotic.csv()`. The defaults (semicolon, UTF-8 BOM) open correctly
+ * in Excel in locales that use a decimal comma.
+ */
 export interface CsvOptions {
-	columns?: string[] | null; // Defaults to the keys of the first row
+	/**
+	 * Column order. Fields missing from it are skipped, with one warning.
+	 * @defaultValue the keys of the first row
+	 */
+	columns?: string[] | null;
+	/** @defaultValue `';'` */
 	delimiter?: string;
+	/**
+	 * Start the file with a UTF-8 byte order mark.
+	 * @defaultValue `true`
+	 */
 	bom?: boolean;
 }
 

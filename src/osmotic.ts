@@ -23,11 +23,24 @@ import type {
 	Step,
 } from './types.js';
 
+/**
+ * The test for {@link Osmotic.filter}: a selector that passes when the current node
+ * contains a match, or a function that passes when it returns true.
+ */
 export type FilterTest = string | (($: CheerioAPI, node: PageNode, data: Data) => boolean | Promise<boolean>);
 
+/** Options for {@link Osmotic.recurse}. */
 export interface RecurseOptions {
-	sameDomain?: boolean; // Only follow links to the current page's host
-	exclude?: RegExp[]; // Skip URLs whose pathname matches any of these
+	/**
+	 * Only follow links to the current page's host.
+	 * @defaultValue `true`
+	 */
+	sameDomain?: boolean;
+	/**
+	 * Skip URLs whose pathname matches any of these.
+	 * @defaultValue `[]`
+	 */
+	exclude?: RegExp[];
 }
 
 // State that lives for a single run()
@@ -60,7 +73,21 @@ const all = (branches: Promise<unknown>[]): Promise<void> => Promise.all(branche
 // frame keeps ctx reachable, and with it the page's whole DOM, until every branch
 // below it has finished, which on a long crawl is most pages ever loaded.
 
+/**
+ * A chainable scraper. Each command adds a step to the chain; {@link Osmotic.run}
+ * starts at the first step and runs every branch to the end.
+ *
+ * @example
+ * ```ts
+ * await Osmotic.get('https://news.ycombinator.com')
+ * 	.find('tr.athing')
+ * 	.set({ title: '.titleline > a' })
+ * 	.csv('hn.csv')
+ * 	.run();
+ * ```
+ */
 export class Osmotic {
+	/** The current options. Change them with {@link Osmotic.config}. */
 	readonly opts: OsmoticOptions = {
 		concurrency: 4,
 		maxPages: 100,
@@ -81,15 +108,18 @@ export class Osmotic {
 	private readonly events = new Emitter();
 	private state: RunState | null = null;
 
+	/** Start a new chain by loading `url`. Shorthand for `new Osmotic().get(url)`. */
 	static get(url: string): Osmotic {
 		return new Osmotic().get(url);
 	}
 
+	/** Merge `opts` into the current options. */
 	config(opts: Partial<OsmoticOptions>): this {
 		Object.assign(this.opts, opts);
 		return this;
 	}
 
+	/** Append a step to the chain. Same as {@link Osmotic.use}. */
 	add(step: Step): this {
 		this.steps.push(step);
 		return this;
@@ -97,15 +127,26 @@ export class Osmotic {
 
 	// --- Extension points -----------------------------------------------------
 
-	// Insert a custom chain step: fn(ctx, next). Call next(ctx) zero times to
-	// stop the branch, once to continue, or several times to branch.
+	/**
+	 * Insert a custom chain step. Call `next(ctx)` zero times to stop the branch,
+	 * once to continue, or several times to branch.
+	 *
+	 * @example
+	 * ```ts
+	 * .use(async (ctx, next) => {
+	 * 	if (/ai|llm/i.test(ctx.data.title)) await next(ctx);
+	 * })
+	 * ```
+	 */
 	use(fn: Step): this {
 		return this.add(fn);
 	}
 
-	// Wrap every HTTP request: mw(req, next) where req = { url, headers, slot }
-	// and next(req) returns a Response. Middleware runs in the order added.
-	// A middleware's own onStart/onEnd hooks are registered as start/end handlers.
+	/**
+	 * Wrap every HTTP request. `next(req)` returns the `Response`, and middleware runs
+	 * in the order added. A middleware's own `onStart` and `onEnd` hooks are
+	 * registered as `start` and `end` handlers.
+	 */
 	useFetch(mw: FetchMiddleware): this {
 		this.fetchMiddleware.push(mw);
 		if (mw.onStart) this.on('start', () => mw.onStart!());
@@ -113,26 +154,49 @@ export class Osmotic {
 		return this;
 	}
 
-	// Listen for run events:
-	//   start  before the first request (awaited; throwing aborts the run)
-	//   page   a page was fetched and parsed
-	//   skip   a URL was not fetched or not parsed, with the reason
-	//   error  a request failed (replaces the default console output)
-	//   end    after the run, also when it failed (awaited; every handler runs)
+	/**
+	 * Listen for a run event:
+	 *
+	 * - `start`: before the first request (awaited; throwing aborts the run)
+	 * - `page`: a page was fetched and parsed
+	 * - `skip`: a URL was not fetched or not parsed, with the reason
+	 * - `error`: a request failed (replaces the default console output)
+	 * - `end`: after the run, also when it failed (awaited; every handler runs)
+	 *
+	 * `page`, `skip` and `error` handlers are not awaited, so a slow handler never
+	 * holds up the crawl.
+	 */
 	on<E extends OsmoticEvent>(event: E, handler: Handler<E>): this {
 		this.events.on(event, handler);
 		return this;
 	}
 
+	/** Remove a handler added with {@link Osmotic.on}. */
 	off<E extends OsmoticEvent>(event: E, handler: Handler<E>): this {
 		this.events.off(event, handler);
 		return this;
 	}
 
-	// Register a reusable chainable command on all Osmotic instances.
-	// factory(...args) must return a step function (ctx, next) => Promise.
-	// TypeScript callers declare the new method through interface merging:
-	//   declare module "osmotic" { interface Osmotic { tap(label: string): this } }
+	/**
+	 * Register a reusable chainable command on all Osmotic instances.
+	 *
+	 * @param name - The method name.
+	 * @param factory - Returns the step for the given arguments. Called with `this`
+	 * bound to the instance.
+	 * @throws If a method called `name` already exists.
+	 *
+	 * @example
+	 * ```ts
+	 * Osmotic.command('pause', (ms: number) => (ctx, next) => sleep(ms).then(() => next(ctx)));
+	 *
+	 * // TypeScript callers declare the new method through interface merging:
+	 * declare module 'osmotic' {
+	 * 	interface Osmotic {
+	 * 		pause(ms: number): this;
+	 * 	}
+	 * }
+	 * ```
+	 */
 	static command<A extends unknown[]>(name: string, factory: (this: Osmotic, ...args: A) => Step): void {
 		if (name in Osmotic.prototype) throw new Error(`Osmotic command "${name}" already exists`);
 		(Osmotic.prototype as unknown as Record<string, unknown>)[name] = function (this: Osmotic, ...args: A) {
@@ -142,7 +206,7 @@ export class Osmotic {
 
 	// --- Commands -------------------------------------------------------------
 
-	// Load a page; relative URLs resolve against the current page
+	/** Load a page. Relative URLs resolve against the current page. */
 	get(url: string): this {
 		const priority = this.steps.length;
 		return this.add((ctx, next) => {
@@ -152,7 +216,7 @@ export class Osmotic {
 		});
 	}
 
-	// Continue the chain once per matching element
+	/** Continue the chain once per element matching `selector`. */
 	find(selector: string): this {
 		return this.add((ctx, next) => {
 			const { $, node } = pageOf(ctx);
@@ -161,8 +225,10 @@ export class Osmotic {
 		});
 	}
 
-	// Selector: continue only if the current node contains a match
-	// Function: continue only if test($, node, data) returns true
+	/**
+	 * Continue only if `test` passes: a selector passes when the current node contains
+	 * a match, and a function `($, node, data)` passes when it returns true.
+	 */
 	filter(test: FilterTest): this {
 		return this.add((ctx, next) => {
 			const { $, node } = pageOf(ctx);
@@ -173,7 +239,14 @@ export class Osmotic {
 		});
 	}
 
-	// Extract fields relative to the current node and merge into data
+	/**
+	 * Extract fields relative to the current node and merge them into `data`.
+	 *
+	 * @example
+	 * ```ts
+	 * .set({ title: 'h1', image: 'meta[property="og:image"]@content', tags: ['.tag'] })
+	 * ```
+	 */
 	set(fields: Record<string, Spec>): this {
 		return this.add((ctx, next) => {
 			const { $, node, base } = pageOf(ctx);
@@ -185,7 +258,7 @@ export class Osmotic {
 		});
 	}
 
-	// Load every URL found by spec; data collected so far carries over
+	/** Load every URL found by `spec`. Data collected so far carries over. */
 	follow(spec = 'a@href'): this {
 		const priority = this.steps.length;
 		return this.add((ctx, next) => {
@@ -194,8 +267,10 @@ export class Osmotic {
 		});
 	}
 
-	// Run the rest of the chain on this page, then follow links found by spec
-	// and repeat this step on each new page (each URL is visited once per run)
+	/**
+	 * Run the rest of the chain on this page, then follow links found by `spec` and
+	 * repeat this step on each new page. Each URL is visited once per run.
+	 */
 	recurse(spec = 'a@href', { sameDomain = true, exclude = [] }: RecurseOptions = {}): this {
 		const priority = this.steps.length;
 		const step = (ctx: Context, next: Next): Promise<void> => {
@@ -211,7 +286,7 @@ export class Osmotic {
 		return this.add(step);
 	}
 
-	// Log "[label] url" for each branch reaching this step, then continue
+	/** Log `[label] url` for each branch reaching this step, then continue. */
 	tap(label = 'tap'): this {
 		return this.add((ctx, next) => {
 			console.log(`[${label}] ${ctx.url ?? '(no page)'}`);
@@ -219,14 +294,15 @@ export class Osmotic {
 		});
 	}
 
-	// Receive the collected data, then continue
+	/** Call `cb` with the collected data, then continue. `cb` may be async. */
 	data(cb: (data: Data, ctx: Context) => unknown): this {
 		return this.add((ctx, next) => Promise.resolve(cb(ctx.data, ctx)).then(() => next(ctx)));
 	}
 
-	// Write each data object reaching this step as a CSV row, streamed to disk.
-	// Columns come from options.columns, or from the keys of the first row.
-	// Defaults suit Swedish Excel: semicolon delimiter and a UTF-8 BOM.
+	/**
+	 * Write each data object reaching this step as a CSV row, streamed to disk.
+	 * Columns come from `options.columns`, or from the keys of the first row.
+	 */
 	csv(path: string, options: CsvOptions = {}): this {
 		const sink = new CsvSink(path, options);
 		this.sinks.push(sink);
@@ -238,15 +314,24 @@ export class Osmotic {
 
 	// --- Helpers for custom commands -------------------------------------------
 
-	// Unique absolute http(s) URLs found by spec relative to the current node
+	/**
+	 * Unique absolute http(s) URLs found by `spec`, relative to the current node.
+	 * @throws If no page is loaded yet.
+	 */
 	links(ctx: Context, spec: string): string[] {
 		const { $, node, base } = pageOf(ctx);
 		return links($, node, spec, base);
 	}
 
-	// Fetch and parse url, or null if it was already seen, is disallowed,
-	// exceeds maxPages, fails, or isn't HTML. Requests with a higher priority get
-	// the next free slot first; built-in steps use their position in the chain.
+	/**
+	 * Fetch and parse `url`.
+	 *
+	 * @param priority - Requests with a higher priority get the next free slot first.
+	 * Built-in steps use their position in the chain.
+	 * @returns The page, or `null` if the URL was already seen, is disallowed, exceeds
+	 * `maxPages`, fails, or isn't HTML.
+	 * @throws If called outside {@link Osmotic.run}.
+	 */
 	async fetchPage(url: string, priority = 0): Promise<Page | null> {
 		const run = this.runState();
 		if (run.seen.has(url)) return null; // Duplicates are expected; not reported as skips
@@ -289,6 +374,12 @@ export class Osmotic {
 
 	// --- Running --------------------------------------------------------------
 
+	/**
+	 * Run the chain. Resolves once every branch has finished.
+	 *
+	 * CSV files are closed and `end` handlers run even if the run fails.
+	 * @throws What a step or `start` handler threw.
+	 */
 	async run(): Promise<void> {
 		const slotConfigs = this.opts.slots ?? Array.from({ length: this.opts.concurrency }, () => ({}));
 		const run: RunState = {
