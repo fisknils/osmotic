@@ -16,6 +16,10 @@
 
    > yes
 
+3. Sent while Claude was moving the files: the class's command methods had become one-line calls.
+
+   > can we use arrow- functions in Osmotic.ts for the one- line methods?
+
 ## Interpretation
 
 Move `src/` into the layout CLAUDE.md describes, with no behavior changes:
@@ -42,7 +46,24 @@ Other (refactor). No behavior changes.
 None. The public API and its types don't change, and `exports` in `package.json` only exposes the entry points, so
 the internal paths in `dist/` aren't reachable by users.
 
+## Decisions
+
+- Prompt 3, open: Claude recommended keeping the command methods as methods, not arrow-function properties. Arrow
+  properties live on each instance,
+  not on the prototype, and `Osmotic.command()` and `Osmotic.plugins()` detect taken names with
+  `name in Osmotic.prototype`. A plugin could then register `get` without an error, and the instance property would
+  silently shadow it. Arrow properties also can't be overridden or reached through `super` in a subclass.
+- `links()` in the old `extract.ts` is now `collectLinks()` in `utils/collect-links.ts`, named after its file and no
+  longer sharing a name with `Osmotic#links()`.
+- `test/create-site.ts` stays: it holds the tests for the `createSite()` helper, one file per feature as CLAUDE.md
+  asks, not a misplaced helper.
+
 ## Verification
 
-The existing tests and type tests are the check that nothing changed: `npm test` passes without changing any test,
-except the paths that tests use to augment internal modules (`declare module '../src/…'`).
+- `npm test` passes, 115 tests, with no test changed except the paths that tests use to augment internal modules
+  (`declare module '../src/…'`) and a comment in `test/memory.ts` naming the file of `detach()`. This includes the
+  type tests, the memory tests and `test/package.ts`, which loads both entry points from `dist/`.
+- `src/index.cts` exports the same 29 names as on `master`.
+- The plugins augment `declare module 'osmotic'`, not internal paths, and `exports` in `package.json` only exposes the
+  entry points, so no plugin can reach the moved files. Checked by searching the sibling plugin repositories.
+- The examples still parse (`node -c examples/*.js`).
