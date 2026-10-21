@@ -17,10 +17,10 @@ After merging to master:
 
 ## Project structure
 
-Source code goes in `source/`, grouped into folders by role. `source/` holds only the entry points and those folders:
+Source code goes in `src/`, grouped into folders by role. `src/` holds only the entry points and those folders:
 
 ```
-source/
+src/
   index.cts          CommonJS entry point: assembles and exports the public API
   index.mts          ESM entry point: re-exports the CommonJS build
   core/              the Osmotic class and the machinery it runs on
@@ -38,13 +38,13 @@ distribution/        build output (not committed)
 - `errors/`: every custom error class gets its own file named after the class (`OsmoticError.ts`). Add the folder with the first one; until then, plain `Error` is fine.
 - `utils/`: pure functions that don't import from `core/`, in kebab-case files named after what they do (`delay.ts`, `normalize-selector.ts`, `resolve-url.ts`).
 - Code moves into the folder its role matches. A file that mixes roles is split: an event emitter class goes to `core/`, its event payload types to `types/`.
-- `test/`: one kebab-case file per feature or behavior (`recurse.ts`, `export.ts`, `robots.ts`, `plugins.ts`), not one file per source file. Shared setup lives in `test/helpers/`, exported through `test/helpers/index.ts`. Tests use `node:test` and import from `source/`.
+- `test/`: one kebab-case file per feature or behavior (`recurse.ts`, `export.ts`, `robots.ts`, `plugins.ts`), not one file per source file. Shared setup lives in `test/helpers/`, exported through `test/helpers/index.ts`. Tests use `node:test` and import from `src/`.
 - `test-d/`: type tests for the public API, one file per feature, using `@ts-expect-error` for calls that must not compile.
 
 TypeScript config is layered:
 
-- `tsconfig.json`: shared compiler options; includes `source`.
-- `tsconfig.dist.json`: extends it for the build (`rootDir: source`, `outDir: distribution`, source maps).
+- `tsconfig.json`: shared compiler options; includes `src`.
+- `tsconfig.dist.json`: extends it for the build (`rootDir: src`, `outDir: distribution`, source maps).
 - `tsconfig.test.json`: extends it with `noEmit` and includes `test-d`, so `npm test` type-checks the type tests.
 
 `npm run build` compiles with `tsconfig.dist.json`. `npm test` builds, type-checks `test-d`, and then runs `test/`. The `files` field in `package.json` publishes `distribution`, and `main`, `types` and `exports` point into it.
