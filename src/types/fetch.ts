@@ -32,6 +32,10 @@ export interface FetchRequest {
 	 * exporters close and `end` handlers run, also when the run fails. A callback that throws
 	 * or rejects is logged and doesn't fail the run.
 	 *
+	 * When the run fails, every page is released before `end` handlers run, also pages that
+	 * steps on other branches are still working on. Pages those branches load later are
+	 * released as soon as they load.
+	 *
 	 * Built-in steps let go of a page as soon as they have passed it on, so `get()`, `follow()`
 	 * and `recurse()` don't keep it while their links load. A custom step holds the page until
 	 * its promise settles. Pages without callbacks aren't tracked, so they cost nothing.

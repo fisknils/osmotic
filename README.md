@@ -384,6 +384,9 @@ const render = async (req, next) => {
   runs exactly once, and all of them have settled before exporters close and `end`
   handlers run, also when the run fails. A callback that throws or rejects is logged
   and doesn't fail the run.
+- When the run fails, every page is released before `end` handlers run, also pages
+  that steps on other branches are still working on. Pages those branches load later
+  are released as soon as they load.
 - Built-in steps let go of a page as soon as they have passed it on. `find()` lets go
   once it has started its branches, `filter()`, `data()` and `export()` once they
   continue, and `get()`, `follow()` and `recurse()` right away, so a page isn't held
