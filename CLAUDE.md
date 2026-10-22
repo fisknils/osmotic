@@ -155,7 +155,7 @@ fine on your own branch, never on `master`.
 ## After merging to master
 
 - Delete the source branch (`gh pr merge --delete-branch` does this).
-- Run `npm run build` and `npm publish`.
+- Run `npm publish`. Its `prepublishOnly` script runs `npm run build` first.
 
 ## Project structure
 
