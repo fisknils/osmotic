@@ -187,11 +187,10 @@ dist/                build output (not committed)
 
 TypeScript config is layered:
 
-- `tsconfig.json`: shared compiler options; includes `src`.
-- `tsconfig.dist.json`: extends it for the build (`rootDir: src`, `outDir: dist`, source maps).
-- `tsconfig.test.json`: extends it with `noEmit` and includes `test` and `test-d`, so `npm test` type-checks the tests and the type tests.
+- `tsconfig.json`: the compiler options and every file that is type-checked (`src`, `test` and `test-d`), with `noEmit`. Editors only read files named `tsconfig.json`, so this is the config they check every file against, and the one `npm test` type-checks with.
+- `tsconfig.dist.json`: extends it for the build: only `src`, emitted to `dist` with declarations and source maps.
 
-`npm run build` compiles with `tsconfig.dist.json`. `npm test` builds, type-checks `test/` and `test-d/`, and then runs `test/*.ts`. The `files` field in `package.json` publishes `dist`, and `main`, `types` and `exports` point into it.
+`npm run build` compiles with `tsconfig.dist.json`. `npm test` builds, type-checks everything with `tsconfig.json`, and then runs `test/*.ts`. The `files` field in `package.json` publishes `dist`, and `main`, `types` and `exports` point into it.
 
 When you add a file, put it where this layout says it belongs. Moving existing files into this layout is a refactor of its own, on its own branch, with no behavior changes.
 
