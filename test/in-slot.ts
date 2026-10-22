@@ -91,24 +91,28 @@ test("inSlot() with a url waits out that site's Crawl-delay, shared with page lo
 });
 
 test('inSlot() waits for the slot it is given', async (t) => {
-	const ids: number[] = [];
+	let busyId = -1;
+	let gotId = -2;
 	let waited = 0;
 	await inRun(
 		t,
 		async (chain) => {
-			const busy = chain.inSlot((slot) => sleep(100).then(() => slot));
-			const first = await chain.inSlot((slot) => slot);
-			assert.equal(first.id, 1, 'the other slot is free');
+			const busy = chain.inSlot((slot) => {
+				busyId = slot.id;
+				return sleep(100);
+			});
+			const other = await chain.inSlot((slot) => slot);
+			assert.notEqual(other.id, busyId, 'the other slot is free');
 			const started = Date.now();
-			const slot0: Slot = { id: 0 };
-			ids.push(await chain.inSlot((slot) => slot.id, { slot: slot0 }));
+			const wanted: Slot = { id: busyId };
+			gotId = await chain.inSlot((slot) => slot.id, { slot: wanted });
 			waited = Date.now() - started;
-			ids.push((await busy).id);
+			await busy;
 		},
 		{ concurrency: 2 },
 	);
-	assert.deepEqual(ids, [0, 0]);
-	assert.ok(waited >= 50, `waited ${waited}ms for slot 0 while slot 1 was free`);
+	assert.equal(gotId, busyId);
+	assert.ok(waited >= 50, `waited ${waited}ms for the busy slot while the other was free`);
 });
 
 test('inSlot() goes ahead of waiting page loads, unless given a lower priority', async (t) => {

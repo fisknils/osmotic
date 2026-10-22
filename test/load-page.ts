@@ -6,7 +6,7 @@ import { openSite, scrape } from './helpers/index.js';
 test('loadPage() parses HTML with the built-in pseudo-classes and the pseudos option', () => {
 	const chain = new Osmotic().config({ pseudos: { sale: '.badge-sale' } });
 	const page = chain.loadPage(
-		'<p>Lamp</p><p class="badge-sale">Charger</p><td>Price</td><td>99</td>',
+		'<p>Lamp</p><p class="badge-sale">Charger</p><table><tr><td>Price</td><td>99</td></tr></table>',
 		'https://example.com/shop',
 	);
 	assert.equal(page.$('p:contains("Lamp")').length, 1);

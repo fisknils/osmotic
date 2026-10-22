@@ -46,19 +46,24 @@ Osmotic.command('releaseTestLoad', function (path: string) {
 		this.fetchPage(new URL(path, ctx.url).href).then((page) => (page ? next({ ...ctx, ...page }) : undefined));
 });
 
-Osmotic.exporter('release-test-slow', (file, options: { wait: (n: number) => Promise<void> }) => ({
-	write: (row) => options.wait(Number(row.n)),
+Osmotic.exporter('release-test-slow', (file, options?: { wait: (n: number) => Promise<void> }) => ({
+	write: (row) => options!.wait(Number(row.n)),
 	end: () => {},
 }));
 
 test('a recurse() crawl keeps at most two pages unreleased, and releases every page by the end', async (t) => {
-	const site = await openSite(t, archive({ pages: 30, padding: 1000 }));
+	// Each page takes longer to load than the step below takes on the page before it
+	const slowPages = Object.entries(archive({ pages: 30, padding: 1000 })).map(([path, body]) => [
+		path,
+		{ body: body as string, wait: 15 },
+	]);
+	const site = await openSite(t, Object.fromEntries(slowPages));
 	const r = releases();
 	await Osmotic.get(site.url(archivePage(1)))
 		.useFetch(r.middleware)
 		.recurse('a.older@href')
 		.use(async (ctx, next) => {
-			await sleep(20);
+			await sleep(5);
 			return next(ctx);
 		})
 		.run();
@@ -140,9 +145,13 @@ test('a page stays held after a loadPage() result is spread over it', async (t) 
 	assert.deepEqual(r.released, ['/']);
 });
 
-test('get() and follow() let go of the page they leave', async (t) => {
+test('get() and follow() let go of the page they leave, also on branches from find()', async (t) => {
 	const site = await openSite(t, archive({ pages: 1, articles: 5, padding: 1000 }));
-	for (const leave of [(c: Osmotic) => c.get(archiveArticle(1, 0)), (c: Osmotic) => c.follow('article a@href')]) {
+	for (const leave of [
+		(c: Osmotic) => c.get(archiveArticle(1, 0)),
+		(c: Osmotic) => c.follow('article a@href'),
+		(c: Osmotic) => c.find('article').follow('a@href'),
+	]) {
 		const r = releases();
 		const seen: boolean[] = [];
 		await leave(Osmotic.get(site.url(archivePage(1))).useFetch(r.middleware))

@@ -107,15 +107,34 @@ settle, and release tracking for pages that custom commands load with `fetchPage
 
 - **How built-in steps let go of a page.** The rule "a built-in step lets go as soon as it has passed the page on"
   depends on when each step calls `next()`. Two kinds, marked where the steps are built:
+
   - lets go when it returns: `find()`, `set()`, `tap()`, `get()`, `follow()` and `recurse()`, which call `next()`
     synchronously for every branch, or pass on only the data.
   - lets go at its first `next()` call, or when its promise settles if it never calls it: `filter()`, `data()` and
     `export()`, which may wait for a function before continuing.
 
   Any other step holds the page until its promise settles, as agreed.
+
 - **Where the tracker lives.** Release state is keyed by the page's frozen `attached` object in a `WeakMap`, so spreading
   a `loadPage()` result keeps it, `withoutPage()` and a spread `fetchPage()` result drop it, and nothing holds a page's
   DOM. A run that never calls `onRelease()` only checks one boolean per step.
+- **Branches still running after a failed run.** When a step fails, `run()` doesn't wait for the other branches (as
+  before). A page those branches load after the release callbacks have settled is released as soon as it's loaded,
+  so nothing leaks, but its callbacks run after `run()` has rejected. Waiting for those branches would change how
+  failed runs end, which is out of scope.
+- **Tests that were wrong** (found when the code first ran against them, fixed before any further code change):
+  - `a recurse() crawl keeps at most two pages unreleased`: its custom step slept 20 ms while the local pages load in
+    about 1.5 ms, so about 14 pages really were still being worked on. No release rule can keep that at 2 without
+    releasing a page a step is still on, which another criterion forbids. The test now serves each page with a 15 ms
+    delay and sleeps 5 ms in the step, so the next page always loads after the step on the previous one finished, as
+    the criterion assumes.
+  - `loadPage() parses HTML with the built-in pseudo-classes`: its `<td>` cells weren't inside a `<table>`, so the HTML
+    parser dropped them. They are now.
+  - `inSlot() waits for the slot it is given`: it assumed that the slot a page load frees goes back to the front of the
+    free list, so the next `inSlot()` would get slot 0. It goes to the back, and the criteria don't say which free slot
+    comes first. The test now waits for whichever slot the busy call took.
+  - The exporter in `test/release.ts` declared its `options` as always present, but an `ExporterFactory` gets
+    `options | undefined`, so the file didn't compile.
 
 ## Verification
 
