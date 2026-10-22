@@ -4,6 +4,35 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows
 [Semantic Versioning](https://semver.org/).
 
+## [3.2.0] - 2026-10-22
+
+### Added
+
+- Fetch middleware can keep something open for the page it loads, such as a browser
+  page, and close it once the chain is done with the page
+  ([#4](https://github.com/fisknils/osmotic/issues/4)):
+  - `req.attach(key, value)` passes a value to the steps on the page, which read it
+    from the new `ctx.attached`. `get()`, `follow()` and `recurse()` drop it with the
+    rest of the page.
+  - `req.onRelease(fn)` calls `fn` once no step is still working on the page, or right
+    away if the page is skipped or fails. Built-in steps let go of a page as soon as
+    they have passed it on, so a `recurse()` crawl keeps only the pages it is working
+    on open. A custom step holds the page until its promise settles. All callbacks
+    have settled before exporters close and `end` handlers run. Pages without
+    callbacks aren't tracked, so chains that don't use it are unaffected.
+- `loadPage(html, url)` parses HTML the way fetched pages are parsed, with the selector
+  extras, the `pseudos` option and `<base href>`, so a command can continue on HTML
+  that changed after the page loaded.
+- `inSlot(fn, { slot, url, priority })` runs `fn` inside a request slot, with the same
+  limits and delays as a page load, so requests a command makes, such as a click in a
+  browser page, keep to `concurrency`, `slots`, `delay` and `Crawl-delay`.
+- The `InSlotOptions` type.
+
+### Changed
+
+- Pages returned by `fetchPage()` now have an `attached` key, `{}` when no middleware
+  attached anything.
+
 ## [3.1.1] - 2026-10-22
 
 ### Fixed
