@@ -6,6 +6,8 @@ import type { Step } from '../types/context.js';
 /**
  * Builds the step of {@link Osmotic.get}: load `url` and continue the chain on it.
  *
+ * Lets go of a page whose release is tracked when it returns, so the page isn't held while the new one loads.
+ *
  * @param host - The instance the step is added to.
  * @param url - The URL to load; a relative one resolves against the current page.
  * @returns The step.

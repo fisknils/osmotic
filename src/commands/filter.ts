@@ -7,6 +7,8 @@ import { normalizeSelector } from '../utils/normalize-selector.js';
 /**
  * Builds the step of {@link Osmotic.filter}: continue only if `test` passes.
  *
+ * Lets go of a page whose release is tracked when it continues, or when it settles without continuing.
+ *
  * @param test - A selector that must match inside the current node, or a function that
  * must return or resolve to a truthy value.
  * @returns The step.

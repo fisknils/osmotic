@@ -160,6 +160,10 @@ export class Osmotic {
 	 * Return `next()`'s promise instead of awaiting it where you can: an `async` step that
 	 * awaits keeps the page's DOM alive until every branch below it has finished.
 	 *
+	 * On a page whose fetch middleware called `req.onRelease()`, the step holds the page until
+	 * its promise settles, and since that promise includes `next()`'s, until everything after
+	 * it on the branch has finished.
+	 *
 	 * @param fn - The step. It gets the context and `next`, and returns a promise that
 	 * settles when its branches are done.
 	 *
@@ -639,7 +643,8 @@ export class Osmotic {
 	 * Run the chain. Resolves once every branch has finished. A chain can be run again;
 	 * each run starts with no pages seen and fresh exports.
 	 *
-	 * Exporters are closed and `end` handlers run even if the run fails. After every run it
+	 * Exporters are closed and `end` handlers run even if the run fails, after every page's
+	 * `onRelease` callbacks have settled. After every run it
 	 * logs a line per export to the console, with the rows written. After a successful run
 	 * it also logs the number of pages fetched and, if any, of URLs skipped because of
 	 * `robots.txt`.

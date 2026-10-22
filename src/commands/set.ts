@@ -9,6 +9,8 @@ import { pick } from '../utils/pick.js';
  * Builds the step of {@link Osmotic.set}: extract `fields` relative to the current node
  * and merge them into `data`.
  *
+ * Lets go of a page whose release is tracked when it returns.
+ *
  * @param host - The instance the step is added to; its `resolveUrls` option is read when
  * the step runs.
  * @param fields - The specs to extract, by field name.

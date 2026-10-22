@@ -10,6 +10,8 @@ import type { ExportOptions } from '../types/exporters.js';
  * Builds the step of {@link Osmotic.export}: write each data object reaching it to `file`,
  * and registers the export with `host` so runs reset and close it.
  *
+ * Lets go of a page whose release is tracked when it continues, or when writing fails.
+ *
  * @typeParam T - The export type.
  * @param host - The instance the step is added to.
  * @param type - The export type, such as `'csv'`.

@@ -7,6 +7,8 @@ import type { Step } from '../types/context.js';
  * Builds the step of {@link Osmotic.follow}: load every URL found by `spec`, carrying the
  * data collected so far but not the page.
  *
+ * Lets go of a page whose release is tracked when it returns, so the page isn't held while its links load.
+ *
  * @param host - The instance the step is added to.
  * @param spec - Where to find the links: `"selector@attr"`.
  * @returns The step.

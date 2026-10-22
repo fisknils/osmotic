@@ -8,6 +8,8 @@ import type { Context, Next, Step } from '../types/context.js';
  * Builds the step of {@link Osmotic.recurse}: run the rest of the chain on this page, then
  * follow the links found by `spec` and repeat the step on each new page.
  *
+ * Lets go of a page whose release is tracked when it returns, so the page isn't held while its links load.
+ *
  * @param host - The instance the step is added to.
  * @param spec - Where to find the links: `"selector@attr"`.
  * @param options - `sameDomain` and `exclude`.

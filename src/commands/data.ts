@@ -6,6 +6,8 @@ import type { Context, Data, Step } from '../types/context.js';
  * Builds the step of {@link Osmotic.data}: call `cb` with the collected data, wait for it,
  * then continue.
  *
+ * Lets go of a page whose release is tracked when it continues, or when `cb` fails.
+ *
  * @param cb - Called as `cb(data, ctx)`; may be async.
  * @returns The step.
  * @throws When the step runs, what `cb` throws or rejects with.

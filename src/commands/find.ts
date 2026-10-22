@@ -6,6 +6,8 @@ import { normalizeSelector } from '../utils/normalize-selector.js';
 /**
  * Builds the step of {@link Osmotic.find}: continue once per element matching `selector`.
  *
+ * Lets go of a page whose release is tracked when it returns, since it has passed the page on to every branch by then.
+ *
  * @param selector - A CSS selector, with the selector extras.
  * @returns The step.
  * @throws When the step runs before a page is loaded, or with an invalid selector.
