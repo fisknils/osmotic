@@ -1,4 +1,4 @@
-import type { Context, Page } from '../types/context.js';
+import type { Context, Page, Step } from '../types/context.js';
 
 // Helpers for the steps in src/commands/.
 //
@@ -16,9 +16,27 @@ export function pageOf(ctx: Context): Page & Context {
 
 // ctx without its page, to carry into pages loaded from it. Requests waiting for a
 // slot then hold only the collected data, not the parent page's DOM.
-export function withoutPage({ $, node, url, base, ...rest }: Context): Context {
+export function withoutPage({ $, node, url, base, attached, ...rest }: Context): Context {
 	return rest;
 }
 
 // Wait for every branch; resolves to undefined so steps keep the Promise<void> type
 export const all = (branches: Promise<unknown>[]): Promise<void> => Promise.all(branches).then(() => undefined);
+
+// When a built-in step lets go of a page whose release is tracked (see ReleaseTracker):
+// - 'return': when it returns, for steps that call next() right away for every branch, or
+//   that pass on only the collected data
+// - 'next': at its first next() call, or when it settles without one, for steps that may
+//   wait for a function before they continue
+// Any other step holds the page until its promise settles.
+export type LetGo = 'return' | 'next';
+
+const letGoWhen = new WeakMap<Step, LetGo>();
+
+// Mark a built-in step with when it lets go of a page
+export function letsGo(when: LetGo, step: Step): Step {
+	letGoWhen.set(step, when);
+	return step;
+}
+
+export const letGoOf = (step: Step): LetGo | undefined => letGoWhen.get(step);

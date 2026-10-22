@@ -17,6 +17,13 @@ export interface Page {
 	url: string;
 	/** Base for relative links: `<base href>` if present, else {@link Page.url}. */
 	base: string;
+	/**
+	 * The values fetch middleware attached to the page with `req.attach()`, frozen. Pages from
+	 * `fetchPage()` always have it, `{}` when nothing was attached, so spreading one over a
+	 * context clears the previous page's values. Pages from `loadPage()` don't, so spreading one
+	 * keeps the current page's values and its release tracking.
+	 */
+	attached?: Readonly<Record<string, unknown>>;
 }
 
 /** State passed along the chain. The page fields are present once a page is loaded. */

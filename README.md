@@ -337,7 +337,8 @@ that can be most of the pages ever loaded, and the process runs out of memory.
 
 ### Fetch middleware: `.useFetch(mw)`
 
-Wraps every HTTP request. `mw(req, next)` receives `{ url, headers, slot }` and
+Wraps every HTTP request. `mw(req, next)` receives `{ url, headers, slot }`, plus
+[`attach` and `onRelease`](#pages-that-hold-resources-reqattach-and-reqonrelease), and
 must return a `Response`, usually by calling `next(req)`. Middleware runs in the
 order it was added.
 
@@ -359,13 +360,60 @@ A middleware can carry `onStart` and `onEnd` functions. `useFetch()` registers t
 as [`start` and `end` handlers](#events), so a middleware can set up and clean up
 after itself.
 
+### Pages that hold resources: `req.attach()` and `req.onRelease()`
+
+A middleware that keeps something open for the page it loads, such as a browser page,
+passes it to later steps with `req.attach(key, value)` and closes it with
+`req.onRelease(fn)`:
+
+```js
+const render = async (req, next) => {
+	const page = await browser.newPage();
+	req.attach('browserPage', page);
+	req.attach('slot', req.slot);
+	req.onRelease(() => page.close());
+	await page.goto(req.url);
+	return new Response(await page.content(), { headers: { 'content-type': 'text/html' } });
+};
+```
+
+- Steps read the values from `ctx.attached`, a frozen object, until the chain leaves the
+  page: `get()`, `follow()` and `recurse()` drop it with the rest of the page.
+- `fn` runs once nothing needs the page any more: once no step is still working on it,
+  or right away if the page is skipped (status, content type) or fails. Every callback
+  runs exactly once, and all of them have settled before exporters close and `end`
+  handlers run, also when the run fails. A callback that throws or rejects is logged
+  and doesn't fail the run.
+- When the run fails, every page is released before `end` handlers run, also pages
+  that steps on other branches are still working on. Pages those branches load later
+  are released as soon as they load.
+- Built-in steps let go of a page as soon as they have passed it on. `find()` lets go
+  once it has started its branches, `filter()`, `data()` and `export()` once they
+  continue, and `get()`, `follow()` and `recurse()` right away, so a page isn't held
+  while its links load. A `recurse()` crawl keeps only the pages it is working on open.
+- A custom step holds the page until its promise settles. Since that promise includes
+  `next()`'s, a custom step between loading a page and leaving it, such as
+  `.click(...).follow('a@href')`, keeps that page open until everything after it on the
+  branch has finished.
+- Pages that custom commands load with `this.fetchPage()` are released when the run
+  ends, not when the chain is done with them.
+- Both functions are closures, so `next({ ...req, url })` keeps them. A later
+  `attach()` with the same key overwrites the earlier value, also when a middleware
+  calls `next(req)` more than once. Calling either one after the middleware chain has
+  returned throws.
+- Pages without `onRelease()` callbacks aren't tracked, so chains that don't use it
+  pay nothing for it.
+
+Commands that act on such a page use [`this.loadPage()` and `this.inSlot()`](#acting-on-a-loaded-page-loadpage-and-inslot).
+
 ### Reusable commands: `Osmotic.command(name, factory)`
 
 Registers a chainable method on every `Osmotic` instance. `factory(...args)` returns
 a step, and is called with `this` bound to the `Osmotic` instance. Inside a custom
 command you can use `this.fetchPage(url)` and `this.links(ctx, spec)`, the same
-helpers the built-in commands use. A name that an `Osmotic` method or property already
-has, such as `find` or `opts`, throws.
+helpers the built-in commands use, and [`this.loadPage()` and `this.inSlot()`](#acting-on-a-loaded-page-loadpage-and-inslot).
+A name that an `Osmotic` method or property already has, such as `find` or `opts`,
+throws.
 
 ```js
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -387,6 +435,38 @@ declare module 'osmotic' {
 
 The ESM and CommonJS entry points share a single `Osmotic` class, so a command
 registered through one is available through the other.
+
+### Acting on a loaded page: `loadPage()` and `inSlot()`
+
+`this.loadPage(html, url)` parses HTML the way fetched pages are parsed: with the
+[selector extras](#selector-extras), the `pseudos` option and `<base href>`. It fires no
+`page` event, doesn't count toward `maxPages` or `stats.pages`, and also works outside
+`run()`. The page it returns has no `attached` key, so spreading it over the context
+keeps the current page's attached values, and the page stays open.
+
+`this.inSlot(fn, { slot, url, priority })` runs `fn(slot)` inside a request slot, as
+politely as a page load: it waits for a free slot, or for `slot` (matched by `id`), then
+waits out the slot's `delay` (or the `delay` option) and, with `url`, that site's
+`Crawl-delay`, shared with page loads. It returns what `fn` returns, frees the slot when
+`fn` settles, and throws outside `run()`. By default it goes ahead of waiting page
+loads, so work on pages that are already open finishes first; a lower `priority` lets
+them go first. It doesn't count toward `maxPages` and doesn't check `robots.txt`. Don't
+call `fetchPage()` or `inSlot()` inside `fn`: with every slot taken, they wait for the
+slot `fn` holds, and the run never ends.
+
+Together with [`req.attach()`](#pages-that-hold-resources-reqattach-and-reqonrelease),
+a command can act on the browser page a middleware loaded, in the slot and through the
+proxy that loaded it, and continue on the new HTML:
+
+```js
+Osmotic.command('click', function (selector) {
+	return async (ctx, next) => {
+		const { browserPage, slot } = ctx.attached;
+		await this.inSlot(() => browserPage.click(selector), { slot, url: ctx.url });
+		return next({ ...ctx, ...this.loadPage(await browserPage.content(), browserPage.url()) });
+	};
+});
+```
 
 ### Export types: `Osmotic.exporter(type, factory)`
 
@@ -498,7 +578,8 @@ Osmotic.plugins([require('osmotic-plugin-pause')({ ms: 1000 })]);
 ```
 
 A plugin never needs to load osmotic itself: commands get the instance as `this`, with
-helpers like `this.fetchPage(url)`, `this.links(ctx, spec)` and `this.opts`. ES
+helpers like `this.fetchPage(url)`, `this.links(ctx, spec)`, `this.loadPage(html, url)`,
+`this.inSlot(fn)` and `this.opts`. ES
 modules can `export default` the plugin or the function; `plugins()` unwraps
 `default`.
 
@@ -541,7 +622,7 @@ runs or count how many are active.
 
 Type declarations are included for both entry points. Useful exported types
 include `Step`, `Context`, `Spec`, `OsmoticOptions`, `SlotConfig`, `FetchMiddleware`,
-`FetchRequest`, `RecurseOptions`, `FilterTest`, `OsmoticEvents`, `RunStats`,
+`FetchRequest`, `RecurseOptions`, `InSlotOptions`, `FilterTest`, `OsmoticEvents`, `RunStats`,
 `SkipReason`, `OsmoticPlugin`, `PluginInput`, `Exporter`, `ExporterFactory`,
 `ExportTypes` and `ExportOptions`. The public API carries TSDoc comments, so editors show
 documentation on hover.

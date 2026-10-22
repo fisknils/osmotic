@@ -18,7 +18,9 @@ export interface CommandHost {
 	 */
 	priority(): number;
 	/**
-	 * Load `url` and continue the chain on it, with `from`'s data carried over.
+	 * Load `url` and continue the chain on it, with `from`'s data carried over. Unlike
+	 * {@link Osmotic.fetchPage}, the page is released as soon as no step holds it any more, if
+	 * its fetch middleware called `req.onRelease()`.
 	 *
 	 * @param url - The absolute URL to load.
 	 * @param from - The context to carry over, without its page.
