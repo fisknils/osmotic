@@ -55,29 +55,29 @@ settle, and release tracking for pages that custom commands load with `fetchPage
 
 ## Acceptance criteria
 
-- [ ] Chains that never call `onRelease()` behave exactly as before, and the existing tests, including `test/memory.ts`,
+- [x] Chains that never call `onRelease()` behave exactly as before, and the existing tests, including `test/memory.ts`,
       pass unchanged.
-- [ ] No measurable slowdown without plugins. Checked by timing the same chain on `master` and on the branch, since a
+- [x] No measurable slowdown without plugins. Checked by timing the same chain on `master` and on the branch, since a
       timing test would be flaky.
-- [ ] A `recurse()` crawl over 30 archive pages, with a middleware that calls `onRelease()` for every page and a custom
+- [x] A `recurse()` crawl over 30 archive pages, with a middleware that calls `onRelease()` for every page and a custom
       async step after `recurse()`, never has more than 2 pages unreleased at once, and has none left when `run()`
       resolves.
-- [ ] A page is never released while a branch from `find()`, an async `filter()`, `data()` or `export()`, or a pending
+- [x] A page is never released while a branch from `find()`, an async `filter()`, `data()` or `export()`, or a pending
       custom step is still on it. It is released once the last one has finished or left it.
-- [ ] With `follow()` directly after loading, a listing page is released before its linked pages finish.
-- [ ] Skipped and failed pages are released right away. Pages from `fetchPage()` carry `attached` and are released only
+- [x] With `follow()` directly after loading, a listing page is released before its linked pages finish.
+- [x] Skipped and failed pages are released right away. Pages from `fetchPage()` carry `attached` and are released only
       when the run ends.
-- [ ] Repeated `next(req)` calls: `attach()` overwrites, and every callback runs exactly once. Both closures work
+- [x] Repeated `next(req)` calls: `attach()` overwrites, and every callback runs exactly once. Both closures work
       through `next({ ...req, url })`, and calling them late throws.
-- [ ] A callback that throws or rejects is logged, the run still resolves with its rows, and the other callbacks still
+- [x] A callback that throws or rejects is logged, the run still resolves with its rows, and the other callbacks still
       run.
-- [ ] Every callback has settled before `end` handlers run, also when a step throws.
-- [ ] Values never reach the next page through `get()`, `follow()`, `recurse()` or a spread `fetchPage()` result.
-- [ ] `loadPage()` supports `:contains()`, `opts.pseudos` and `<base href>`. It emits no `page` event, leaves `maxPages`
+- [x] Every callback has settled before `end` handlers run, also when a step throws.
+- [x] Values never reach the next page through `get()`, `follow()`, `recurse()` or a spread `fetchPage()` result.
+- [x] `loadPage()` supports `:contains()`, `opts.pseudos` and `<base href>`. It emits no `page` event, leaves `maxPages`
       and `stats.pages` alone, and works outside `run()`.
-- [ ] `inSlot()` follows `concurrency`, `delay`, a slot's `delay` and `Crawl-delay`. It waits for the given slot, goes
+- [x] `inSlot()` follows `concurrency`, `delay`, a slot's `delay` and `Crawl-delay`. It waits for the given slot, goes
       ahead of waiting page loads by default, frees the slot when `fn` throws, and throws outside `run()`.
-- [ ] Type tests in `test-d/` cover the new members and signatures, and a `FetchRequest` object written without `attach`
+- [x] Type tests in `test-d/` cover the new members and signatures, and a `FetchRequest` object written without `attach`
       and `onRelease` still compiles.
 
 ## Affected public API
@@ -86,7 +86,7 @@ settle, and release tracking for pages that custom commands load with `fetchPage
 - `FetchRequest.onRelease?: (fn: () => unknown) => void` (added)
 - `Page.attached?: Readonly<Record<string, unknown>>`, and through `Partial<Page>` also `Context.attached` (added)
 - `Osmotic.loadPage(html: string, url: string): Page` (added)
-- `Osmotic.inSlot<T>(fn: (slot: Slot) => T | Promise<T>, options?: InSlotOptions): Promise<T>` (added)
+- `Osmotic.inSlot<T>(fn: (slot: Slot) => T | PromiseLike<T>, options?: InSlotOptions): Promise<T>` (added)
 - `InSlotOptions` type (added)
 - `Osmotic.fetchPage()`: its pages now carry `attached` (changed, additive)
 
@@ -137,6 +137,21 @@ settle, and release tracking for pages that custom commands load with `fetchPage
     `options | undefined`, so the file didn't compile.
 
 ## Verification
+
+`npm test` passes: 144 tests, including the 25 new ones in `test/release.ts`, `test/load-page.ts` and
+`test/in-slot.ts`, the type tests in `test-d/release.ts`, and the unchanged `test/memory.ts`. All 25 failed before the
+code existed. The `find()` then `follow()` case was added to an existing test afterwards. Per criterion:
+
+- Unchanged behavior without `onRelease()`: every existing test passes without changes.
+- No slowdown: timed with a scratch script on a `master` worktree and on this branch in the same process, 20 measured
+  runs each after 5 warm-up runs, both orders, twice. A `find()` over 3000 elements with 5 steps after it: medians
+  118/118, 113/110, 168/150 and 122/112 ms (`master`/branch). A `recurse()` over 150 pages: 1954/1995, 2019/1917,
+  1778/1818 and 1966/1930 ms. The differences go both ways and stay within the run-to-run spread.
+- `recurse()` bound, held pages, `follow()`, skipped and failed pages, `fetchPage()`, repeated `next(req)`, failing
+  callbacks, callbacks before `end`, values not reaching the next page: `test/release.ts`.
+- `loadPage()`: `test/load-page.ts`. `inSlot()`: `test/in-slot.ts`. Types: `test-d/release.ts`, checked by `tsc`.
+- The tests catch a wrong release rule: removing the marker from `find()`, `follow()` or `get()` (so they hold the page
+  until they settle), or marking `data()` to let go when it returns, each makes a test in `test/release.ts` fail.
 
 ## Follow-ups
 
