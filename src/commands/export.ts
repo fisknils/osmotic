@@ -2,6 +2,7 @@ import type { Osmotic } from '../core/Osmotic.js';
 import type { CommandHost } from '../core/command-host.js';
 import { exporterFor } from '../core/exporters.js';
 import { ExportTarget } from '../core/ExportTarget.js';
+import { letsGo } from '../core/page.js';
 import type { Step } from '../types/context.js';
 import type { ExportOptions } from '../types/exporters.js';
 
@@ -27,5 +28,5 @@ export function exportStep<T extends string>(
 	const factory = exporterFor(type);
 	const target = new ExportTarget(file, () => factory(file, options));
 	host.addExport(target);
-	return (ctx, next) => Promise.resolve(target.write(ctx.data)).then(() => next(ctx));
+	return letsGo('next', (ctx, next) => Promise.resolve(target.write(ctx.data)).then(() => next(ctx)));
 }

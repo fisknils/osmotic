@@ -1,5 +1,5 @@
 import type { Osmotic } from '../core/Osmotic.js';
-import { pageOf } from '../core/page.js';
+import { letsGo, pageOf } from '../core/page.js';
 import type { FilterTest } from '../types/commands.js';
 import type { Step } from '../types/context.js';
 import { normalizeSelector } from '../utils/normalize-selector.js';
@@ -14,11 +14,11 @@ import { normalizeSelector } from '../utils/normalize-selector.js';
  * what a test function throws or rejects with.
  */
 export function filterStep(test: FilterTest): Step {
-	return (ctx, next) => {
+	return letsGo('next', (ctx, next) => {
 		const { $, node } = pageOf(ctx);
 		if (typeof test !== 'function') {
 			return $(node).find(normalizeSelector(test)).length > 0 ? next(ctx) : Promise.resolve();
 		}
 		return Promise.resolve(test($, node, ctx.data)).then((ok) => (ok ? next(ctx) : undefined));
-	};
+	});
 }

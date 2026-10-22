@@ -1,5 +1,5 @@
 import type { Osmotic } from '../core/Osmotic.js';
-import { all, pageOf } from '../core/page.js';
+import { all, letsGo, pageOf } from '../core/page.js';
 import type { Step } from '../types/context.js';
 import { normalizeSelector } from '../utils/normalize-selector.js';
 
@@ -11,9 +11,9 @@ import { normalizeSelector } from '../utils/normalize-selector.js';
  * @throws When the step runs before a page is loaded, or with an invalid selector.
  */
 export function findStep(selector: string): Step {
-	return (ctx, next) => {
+	return letsGo('return', (ctx, next) => {
 		const { $, node } = pageOf(ctx);
 		const els = $(node).find(normalizeSelector(selector)).toArray();
 		return all(els.map((el) => next({ ...ctx, node: el })));
-	};
+	});
 }

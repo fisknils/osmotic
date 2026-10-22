@@ -1,6 +1,6 @@
 import type { Osmotic } from '../core/Osmotic.js';
 import type { CommandHost } from '../core/command-host.js';
-import { all, withoutPage } from '../core/page.js';
+import { all, letsGo, withoutPage } from '../core/page.js';
 import type { Step } from '../types/context.js';
 
 /**
@@ -14,8 +14,8 @@ import type { Step } from '../types/context.js';
  */
 export function followStep(host: CommandHost, spec: string): Step {
 	const priority = host.priority();
-	return (ctx, next) => {
+	return letsGo('return', (ctx, next) => {
 		const carry = withoutPage(ctx);
 		return all(host.links(ctx, spec).map((url) => host.visit(url, carry, next, priority)));
-	};
+	});
 }

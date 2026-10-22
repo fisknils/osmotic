@@ -8,7 +8,7 @@ import { getStep } from '../commands/get.js';
 import { recurseStep } from '../commands/recurse.js';
 import { setStep } from '../commands/set.js';
 import { tapStep } from '../commands/tap.js';
-import type { FilterTest, RecurseOptions } from '../types/commands.js';
+import type { FilterTest, InSlotOptions, RecurseOptions } from '../types/commands.js';
 import type { Context, Data, Next, Page, Step } from '../types/context.js';
 import type { Handler, OsmoticEvent, RunStats, SkipReason } from '../types/events.js';
 import type { ExporterFactory, ExportOptions } from '../types/exporters.js';
@@ -27,6 +27,7 @@ import type { ExportTarget } from './ExportTarget.js';
 import { fetchThrough } from './http.js';
 import { pageOf } from './page.js';
 import { loadPlugins, pluginMiddleware } from './plugins.js';
+import { ReleaseTracker } from './ReleaseTracker.js';
 import { RobotsCache } from './RobotsCache.js';
 import { SlotPool } from './SlotPool.js';
 
@@ -35,6 +36,7 @@ interface RunState {
 	seen: Set<string>;
 	robots: RobotsCache;
 	pool: SlotPool;
+	releases: ReleaseTracker;
 	attempts: number;
 	pages: number;
 	robotsSkipped: number;
@@ -533,6 +535,10 @@ export class Osmotic {
 	 * `robots.txt`, `maxPages`, the slots and their delays, and firing `page`, `skip` and
 	 * `error` events.
 	 *
+	 * The page carries the values fetch middleware attached in `attached`, `{}` when there are
+	 * none. Its `onRelease` callbacks run when the run ends, not when the chain is done with
+	 * it, so a page that holds a resource, such as a browser page, stays open until then.
+	 *
 	 * @param url - The absolute URL to fetch.
 	 * @param priority - Requests with a higher priority get the next free slot first.
 	 * Built-in steps use their position in the chain. Defaults to `0`.
@@ -548,42 +554,82 @@ export class Osmotic {
 	 * ```
 	 */
 	async fetchPage(url: string, priority = 0): Promise<Page | null> {
-		const run = this.runState();
-		if (run.seen.has(url)) return null; // Duplicates are expected; not reported as skips
-		run.seen.add(url);
-		if (this.opts.respectRobots && !(await run.robots.allows(url))) {
-			run.robotsSkipped++;
-			return this.skip(url, 'robots');
-		}
-		if (run.attempts >= this.opts.maxPages) return this.skip(url, 'maxPages');
-		run.attempts++;
-		const slot = await run.pool.acquire(priority);
+		return this.load(this.runState(), url, priority, false);
+	}
+
+	/**
+	 * Parse `html` as a page at `url`, the way fetched pages are parsed: with the built-in
+	 * pseudo-classes, the `pseudos` option and the base from `<base href>`. Use it to continue
+	 * on HTML that changed after the page loaded, such as a browser page's after a click.
+	 *
+	 * Unlike {@link Osmotic.fetchPage}, it fires no `page` event, doesn't count toward
+	 * `maxPages` or `stats.pages`, and also works outside {@link Osmotic.run}. The page has no
+	 * `attached` key, so spreading it over a context keeps the current page's attached values
+	 * and its release tracking.
+	 *
+	 * @param html - The HTML to parse.
+	 * @param url - The page's URL, for relative links when there's no `<base href>`.
+	 * @returns The page, positioned at the document root.
+	 *
+	 * @example
+	 * ```ts
+	 * Osmotic.command('click', function (selector: string) {
+	 * 	return async (ctx, next) => {
+	 * 		const page = ctx.attached?.browserPage as BrowserPage;
+	 * 		await page.click(selector);
+	 * 		return next({ ...ctx, ...this.loadPage(await page.content(), page.url()) });
+	 * 	};
+	 * });
+	 * ```
+	 */
+	loadPage(html: string, url: string): Page {
+		const $ = cheerio.load(html, { pseudos: { ...builtinPseudos, ...this.opts.pseudos } });
+		return { $, node: $.root(), url, base: pageBase($, url) };
+	}
+
+	/**
+	 * Run `fn` inside a request slot, as politely as a page load. It waits for a free slot, or
+	 * for `options.slot`, then waits out the slot's `delay` (or the `delay` option) and, with
+	 * `options.url`, that site's `Crawl-delay`, shared with page loads. The slot is freed when
+	 * `fn` settles, also when it throws.
+	 *
+	 * Use it for requests a step makes outside `fetchPage()`, such as clicking in a browser
+	 * page, so they keep to `concurrency`, `slots` and the delays. It doesn't count toward
+	 * `maxPages` and doesn't check `robots.txt`. By default it goes ahead of waiting page
+	 * loads, so work on pages that are already open finishes first.
+	 *
+	 * Don't call `fetchPage()` or `inSlot()` inside `fn`: with every slot taken, they wait for a
+	 * slot that `fn` itself holds, and the run never ends.
+	 *
+	 * @typeParam T - What `fn` returns or resolves to.
+	 * @param fn - The work to do, called with the slot it runs in; may be async.
+	 * @param options - `slot` to wait for, the `url` whose `Crawl-delay` to wait out, and the
+	 * `priority`. Defaults to `{}`.
+	 * @returns What `fn` returns or resolves to.
+	 * @throws If called outside {@link Osmotic.run}, if `options.slot` isn't one of the run's
+	 * slots, or what `fn` throws or rejects with.
+	 *
+	 * @example
+	 * ```ts
+	 * Osmotic.command('click', function (selector: string) {
+	 * 	return async (ctx, next) => {
+	 * 		const page = ctx.attached?.browserPage as BrowserPage;
+	 * 		const slot = ctx.attached?.slot as Slot;
+	 * 		await this.inSlot(() => page.click(selector), { slot, url: ctx.url });
+	 * 		return next({ ...ctx, ...this.loadPage(await page.content(), page.url()) });
+	 * 	};
+	 * });
+	 * ```
+	 */
+	async inSlot<T>(fn: (slot: Slot) => T | PromiseLike<T>, options: InSlotOptions = {}): Promise<T> {
+		const { slot, url, priority = Infinity } = options;
+		const run = this.runState('inSlot() can only be called while run() is in progress');
+		const taken = await run.pool.acquire(priority, slot?.id);
 		try {
-			if (this.opts.respectRobots && this.opts.respectCrawlDelay) {
-				await run.robots.waitCrawlDelay(url);
-			}
-			const delay = slot.delay ?? this.opts.delay;
-			if (delay) await sleep(delay);
-			const started = Date.now();
-			const res = await this.slotFetch(slot, url);
-			const html = (res.headers.get('content-type') || '').includes('html');
-			if (!res.ok || !html) {
-				res.body?.cancel().catch(() => {}); // Release the unread body and its connection
-				return this.skip(url, res.ok ? 'contentType' : 'status', res.status);
-			}
-			const $ = cheerio.load(await res.text(), {
-				pseudos: { ...builtinPseudos, ...this.opts.pseudos },
-			});
-			run.pages++;
-			const finalUrl = res.url || url; // Constructed Responses (e.g. from middleware) have no url
-			this.#events.emit('page', { url: finalUrl, requestedUrl: url, status: res.status, ms: Date.now() - started });
-			return { $, node: $.root(), url: finalUrl, base: pageBase($, finalUrl) };
-		} catch (error) {
-			if (this.#events.has('error')) this.#events.emit('error', { url, error });
-			else console.error(`Failed ${url}: ${error instanceof Error ? error.message : error}`);
-			return null;
+			await this.waitTurn(run, taken, url);
+			return await fn(taken);
 		} finally {
-			run.pool.release(slot);
+			run.pool.release(taken);
 		}
 	}
 
@@ -611,6 +657,7 @@ export class Osmotic {
 			seen: new Set(),
 			robots: new RobotsCache(this.opts.robotsUserAgent ?? this.opts.userAgent),
 			pool: new SlotPool(slotConfigs.map((cfg, id) => ({ id, ...cfg }))),
+			releases: new ReleaseTracker(),
 			attempts: 0,
 			pages: 0,
 			robotsSkipped: 0,
@@ -619,11 +666,14 @@ export class Osmotic {
 		for (const target of this.#exports) target.reset();
 		let failed = false;
 		let failure: unknown;
-		// A step that throws synchronously rejects only its own branch, as an async step would
+		// A step that throws synchronously rejects only its own branch, as an async step would.
+		// On a page whose release is tracked, the step holds the page while it works on it.
 		const runFrom =
 			(i: number): Next =>
 			(ctx) => {
 				if (i >= this.#steps.length) return Promise.resolve();
+				const held = run.releases.tracking ? run.releases.heldBy(ctx) : undefined;
+				if (held) return run.releases.runStep(held, this.#steps[i], ctx, runFrom(i + 1));
 				try {
 					return this.#steps[i](ctx, runFrom(i + 1));
 				} catch (err) {
@@ -637,6 +687,7 @@ export class Osmotic {
 			failed = true;
 			failure = err;
 		}
+		await run.releases.close();
 		// An exporter that fails to close fails the run, unless it had already failed
 		for (const err of await this.closeExports()) {
 			if (failed) console.error(`osmotic: closing an export failed: ${err instanceof Error ? err.stack : err}`);
@@ -659,8 +710,63 @@ export class Osmotic {
 	// Load url and continue the chain on it, with from's data carried over.
 	// Later steps get priority so branches finish (and free memory) before the
 	// crawl widens; first come, first served would queue up the whole site.
-	private visit(url: string, from: Context, next: Next, priority: number): Promise<void> {
-		return this.fetchPage(url, priority).then((page) => (page ? next({ ...from, ...page }) : undefined));
+	// Unlike pages from the public fetchPage(), these are released once no step holds them.
+	private async visit(url: string, from: Context, next: Next, priority: number): Promise<void> {
+		const run = this.runState();
+		const page = await this.load(run, url, priority, true);
+		if (page) return run.releases.deliver({ ...from, ...page }, next);
+	}
+
+	// fetchPage(), with the page's release callbacks either tracked or run when the run ends
+	private async load(run: RunState, url: string, priority: number, track: boolean): Promise<Page | null> {
+		if (run.seen.has(url)) return null; // Duplicates are expected; not reported as skips
+		run.seen.add(url);
+		if (this.opts.respectRobots && !(await run.robots.allows(url))) {
+			run.robotsSkipped++;
+			return this.skip(url, 'robots');
+		}
+		if (run.attempts >= this.opts.maxPages) return this.skip(url, 'maxPages');
+		run.attempts++;
+		const slot = await run.pool.acquire(priority);
+		const attached = new Map<string, unknown>();
+		const callbacks: (() => unknown)[] = [];
+		let page: Page | null = null;
+		try {
+			await this.waitTurn(run, slot, url);
+			const started = Date.now();
+			const res = await this.slotFetch(slot, url, attached, callbacks);
+			const html = (res.headers.get('content-type') || '').includes('html');
+			if (!res.ok || !html) {
+				res.body?.cancel().catch(() => {}); // Release the unread body and its connection
+				return this.skip(url, res.ok ? 'contentType' : 'status', res.status);
+			}
+			const finalUrl = res.url || url; // Constructed Responses (e.g. from middleware) have no url
+			page = { ...this.loadPage(await res.text(), finalUrl), attached: Object.freeze(Object.fromEntries(attached)) };
+			run.pages++;
+			this.#events.emit('page', { url: finalUrl, requestedUrl: url, status: res.status, ms: Date.now() - started });
+			return page;
+		} catch (error) {
+			if (this.#events.has('error')) this.#events.emit('error', { url, error });
+			else console.error(`Failed ${url}: ${error instanceof Error ? error.message : error}`);
+			return null;
+		} finally {
+			run.pool.release(slot);
+			// Skipped and failed pages are released right away
+			if (callbacks.length) {
+				if (!page) run.releases.release(callbacks);
+				else if (track) run.releases.track(page.attached!, callbacks);
+				else run.releases.defer(callbacks);
+			}
+		}
+	}
+
+	// Wait out the site's Crawl-delay, if a url is given, and the slot's delay
+	private async waitTurn(run: RunState, slot: Slot, url?: string): Promise<void> {
+		if (url && this.opts.respectRobots && this.opts.respectCrawlDelay) {
+			await run.robots.waitCrawlDelay(url);
+		}
+		const delay = slot.delay ?? this.opts.delay;
+		if (delay) await sleep(delay);
 	}
 
 	private skip(url: string, reason: SkipReason, status?: number): null {
@@ -668,13 +774,23 @@ export class Osmotic {
 		return null;
 	}
 
-	private runState(): RunState {
-		if (!this.#state) throw new Error('Pages can only be fetched while run() is in progress');
+	private runState(message = 'Pages can only be fetched while run() is in progress'): RunState {
+		if (!this.#state) throw new Error(message);
 		return this.#state;
 	}
 
-	// Fetch through the slot's settings, falling back to the global options
-	private slotFetch(slot: Slot, url: string): Promise<Response> {
+	// Fetch through the slot's settings, falling back to the global options. What middleware
+	// attaches to the page goes into attached and callbacks, until the middleware returns.
+	private async slotFetch(
+		slot: Slot,
+		url: string,
+		attached: Map<string, unknown>,
+		callbacks: (() => unknown)[],
+	): Promise<Response> {
+		let open = true;
+		const check = (name: string) => {
+			if (!open) throw new Error(`req.${name}() can only be called until the fetch middleware returns`);
+		};
 		const req: FetchRequest = {
 			url,
 			slot,
@@ -683,8 +799,21 @@ export class Osmotic {
 				...this.opts.headers,
 				...slot.headers,
 			},
+			attach: (key, value) => {
+				check('attach');
+				attached.set(key, value);
+			},
+			onRelease: (fn) => {
+				check('onRelease');
+				if (typeof fn !== 'function') throw new TypeError('req.onRelease() takes a function');
+				callbacks.push(fn);
+			},
 		};
-		return fetchThrough([...this.#fetchMiddleware, ...this.#pluginFetch], req);
+		try {
+			return await fetchThrough([...this.#fetchMiddleware, ...this.#pluginFetch], req);
+		} finally {
+			open = false;
+		}
 	}
 
 	// Register a middleware's own onStart/onEnd hooks as start/end handlers

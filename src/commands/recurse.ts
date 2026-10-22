@@ -1,6 +1,6 @@
 import type { Osmotic } from '../core/Osmotic.js';
 import type { CommandHost } from '../core/command-host.js';
-import { all, pageOf, withoutPage } from '../core/page.js';
+import { all, letsGo, pageOf, withoutPage } from '../core/page.js';
 import type { RecurseOptions } from '../types/commands.js';
 import type { Context, Next, Step } from '../types/context.js';
 
@@ -30,5 +30,5 @@ export function recurseStep(
 		const again: Next = (child) => step(child, next);
 		return all([next(ctx), ...children.map((url) => host.visit(url, carry, again, priority))]);
 	};
-	return step;
+	return letsGo('return', step);
 }
