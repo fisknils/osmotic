@@ -10,6 +10,11 @@
    >
    > Create the implementation in a new feature branch, then push it, open a PR and launch the review agent
 
+2. The pr-review agent's draft review found one documentation gap: when a run fails, pages are released while other
+   branches still work on them, and the docs don't say so. Claude asked whether to fix it and post the review.
+
+   > post the review, add the sentance, commit, push and merge
+
 ## Interpretation
 
 Build exactly the scope of the last triage comment on issue #4:
@@ -119,8 +124,10 @@ settle, and release tracking for pages that custom commands load with `fetchPage
   a `loadPage()` result keeps it, `withoutPage()` and a spread `fetchPage()` result drop it, and nothing holds a page's
   DOM. A run that never calls `onRelease()` only checks one boolean per step.
 - **Branches still running after a failed run.** When a step fails, `run()` doesn't wait for the other branches (as
-  before). A page those branches load after the release callbacks have settled is released as soon as it's loaded,
-  so nothing leaks, but its callbacks run after `run()` has rejected. Waiting for those branches would change how
+  before). Every open page is released before `end` handlers run, also pages those branches are still working on, so
+  that callbacks settle before `end` as agreed. A page those branches load after that is released as soon as it's
+  loaded, so nothing leaks, but its callbacks run after `run()` has rejected. The review pointed out that the docs
+  didn't say this; the `onRelease` TSDoc and the README now do. Waiting for those branches would change how
   failed runs end, which is out of scope.
 - **Tests that were wrong** (found when the code first ran against them, fixed before any further code change):
   - `a recurse() crawl keeps at most two pages unreleased`: its custom step slept 20 ms while the local pages load in
