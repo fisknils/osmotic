@@ -3,14 +3,13 @@
 		"target": "ES2022",
 		"module": "nodenext",
 		"moduleResolution": "nodenext",
-		"rootDir": "src",
-		"outDir": "dist",
-		"declaration": true,
-		"sourceMap": true,
+		"rootDir": ".",
+		"noEmit": true,
+		"types": ["node"],
 		"strict": true,
 		"esModuleInterop": true,
 		"skipLibCheck": true,
 		"forceConsistentCasingInFileNames": true
 	},
-	"include": ["src"]
+	"include": ["src", "test", "test-d"]
 }
