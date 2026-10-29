@@ -15,7 +15,11 @@ Osmotic.plugins([require('osmotic-plugin-csv')]);
 Osmotic.get('https://news.ycombinator.com')
 	.recurse('a[rel="next"]@href')
 	.find('tr.athing')
-	.set({ rank: '.rank', title: '.titleline > a', link: '.titleline > a@href' })
+	.set({
+		rank: '.rank',
+		title: '.titleline > a',
+		link: '.titleline > a@href'
+	})
 	.export('csv', 'hacker-news.csv')
 	.config({ maxPages: 20 })
 	.run();
@@ -161,7 +165,10 @@ Osmotic.plugins([require('osmotic-plugin-csv')]);
 
 Osmotic.get('https://example.com/products')
 	.find('.product')
-	.set({ name: 'h2', price: '.price' })
+	.set({
+		name: 'h2',
+		price: '.price'
+	})
 	.export('csv', 'products.csv', { delimiter: ',' })
 	.run();
 ```
@@ -418,7 +425,12 @@ throws.
 ```js
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-Osmotic.command('pause', (ms) => (ctx, next) => sleep(ms).then(() => next(ctx)));
+Osmotic.command(
+	'pause',
+	(ms) =>
+		(ctx, next) => sleep(ms)
+			.then(() => next(ctx))
+);
 
 Osmotic.get('https://example.com').pause(500).find('a') /* ... */;
 ```
@@ -463,7 +475,10 @@ Osmotic.command('click', function (selector) {
 	return async (ctx, next) => {
 		const { browserPage, slot } = ctx.attached;
 		await this.inSlot(() => browserPage.click(selector), { slot, url: ctx.url });
-		return next({ ...ctx, ...this.loadPage(await browserPage.content(), browserPage.url()) });
+		return next({
+			...ctx,
+			...this.loadPage(await browserPage.content(), browserPage.url())
+		});
 	};
 });
 ```
@@ -553,7 +568,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 module.exports = {
 	name: 'osmotic-plugin-pause',
 	commands: {
-		pause: (ms) => (ctx, next) => sleep(ms).then(() => next(ctx)),
+		pause: (ms) =>
+			(ctx, next) =>
+				sleep(ms).then(() => next(ctx)),
 	},
 };
 ```
