@@ -6,3 +6,6 @@ node_modules
 
 # Personal Claude Code settings, such as permission rules
 .claude/settings.local.json
+
+# Per- feature plan. No reason to keep it in git, since we're going to remove it anyway.
+PLAN.md
