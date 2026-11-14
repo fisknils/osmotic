@@ -17,6 +17,7 @@ import type { OsmoticOptions, Slot } from '../types/options.js';
 import type { PluginInput } from '../types/plugins.js';
 import type { Spec } from '../types/specs.js';
 import { collectLinks } from '../utils/collect-links.js';
+import { formatDuration } from '../utils/format-duration.js';
 import { pageBase } from '../utils/page-base.js';
 import { builtinPseudos } from '../utils/pseudos.js';
 import { sleep } from '../utils/sleep.js';
@@ -40,6 +41,9 @@ interface RunState {
 	attempts: number;
 	pages: number;
 	robotsSkipped: number;
+	started: number;
+	// Sum of the load times of the fetched pages, for the average in the summary
+	pageMs: number;
 }
 
 /**
@@ -646,8 +650,9 @@ export class Osmotic {
 	 * Exporters are closed and `end` handlers run even if the run fails, after every page's
 	 * `onRelease` callbacks have settled. After every run it
 	 * logs a line per export to the console, with the rows written. After a successful run
-	 * it also logs the number of pages fetched and, if any, of URLs skipped because of
-	 * `robots.txt`.
+	 * it also logs the number of pages fetched, how long the run took and the average load
+	 * time of a page (the mean of the `page` events' `ms`) and, if any, the number of URLs
+	 * skipped because of `robots.txt`.
 	 *
 	 * @throws What a step, `start` handler or exporter threw.
 	 *
@@ -666,6 +671,8 @@ export class Osmotic {
 			attempts: 0,
 			pages: 0,
 			robotsSkipped: 0,
+			started: Date.now(),
+			pageMs: 0,
 		};
 		this.#state = run;
 		for (const target of this.#exports) target.reset();
@@ -706,7 +713,8 @@ export class Osmotic {
 		await this.#events.emitSettled('end', { osmotic: this, stats, ...(failed ? { error: failure } : {}) });
 		this.#state = null;
 		if (failed) throw failure;
-		console.log(`Done. Fetched ${run.pages} page(s).`);
+		const average = run.pages ? `, ${formatDuration(run.pageMs / run.pages)} per page on average` : '';
+		console.log(`Done. Fetched ${run.pages} page(s) in ${formatDuration(Date.now() - run.started)}${average}.`);
 		if (run.robotsSkipped) console.log(`Skipped ${run.robotsSkipped} URL(s) disallowed by robots.txt.`);
 	}
 
@@ -747,8 +755,10 @@ export class Osmotic {
 			}
 			const finalUrl = res.url || url; // Constructed Responses (e.g. from middleware) have no url
 			page = { ...this.loadPage(await res.text(), finalUrl), attached: Object.freeze(Object.fromEntries(attached)) };
+			const ms = Date.now() - started;
 			run.pages++;
-			this.#events.emit('page', { url: finalUrl, requestedUrl: url, status: res.status, ms: Date.now() - started });
+			run.pageMs += ms;
+			this.#events.emit('page', { url: finalUrl, requestedUrl: url, status: res.status, ms });
 			return page;
 		} catch (error) {
 			if (this.#events.has('error')) this.#events.emit('error', { url, error });
