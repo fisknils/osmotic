@@ -42,11 +42,11 @@ Minor
 
 ## Acceptance criteria
 
-- [ ] After a successful run, the summary line gives the number of pages, the total time and the average page load
+- [x] After a successful run, the summary line gives the number of pages, the total time and the average page load
       time.
-- [ ] The average is the mean of the pages' load times, not the total time divided by the pages.
-- [ ] Durations of a second or more are given in seconds, and of a minute or more in minutes and seconds.
-- [ ] With no pages fetched, the line gives the total time and no average.
+- [x] The average is the mean of the pages' load times, not the total time divided by the pages.
+- [x] Durations of a second or more are given in seconds, and of a minute or more in minutes and seconds.
+- [x] With no pages fetched, the line gives the total time and no average.
 
 ## Affected public API
 
@@ -65,4 +65,21 @@ None. Only the console output of `run()` changes.
 
 ## Verification
 
+`test/run.ts` covers every criterion. It mocks `Date`, so time passes only where a test advances the clock: in fetch
+middleware for each page's load time, and in a `start` handler for time outside page loads. The lines are therefore
+checked exactly:
+
+- `the summary gives the total time and the average page load time`: 100, 200 and 300 ms pages give
+  `in 600 ms, 200 ms per page on average`.
+- `the average is over page load times, ...`: 900 ms more in the `start` handler makes the total `1.5 s`, while the
+  average stays at 200 ms (total divided by pages would give 500 ms).
+- `without pages the summary has no average, ...`: a start URL that 404s and 125 s in the `start` handler give
+  `Fetched 0 page(s) in 2 min 5 s.`
+- `run() logs a summary` checks the format of the line in a run with a real clock.
+
+The new tests failed before the code was written (commit b539964), and `npm test` passes with 147 tests.
+
 ## Follow-ups
+
+- The timing could also go into `RunStats` (`stats` in the `end` event) for code that wants it, but this branch leaves
+  that out.

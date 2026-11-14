@@ -4,6 +4,14 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows
 [Semantic Versioning](https://semver.org/).
 
+## [3.3.0] - 2026-11-14
+
+### Added
+
+- The summary that `run()` logs gives how long the run took and the average load time
+  of a page, for example `Done. Fetched 3 page(s) in 1.5 s, 500 ms per page on average.`
+  The average is the mean of the `page` events' `ms`.
+
 ## [3.2.0] - 2026-10-22
 
 ### Added
