@@ -4,6 +4,12 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows
 [Semantic Versioning](https://semver.org/).
 
+## [3.3.1] - 2026-11-14
+
+### Changed
+
+- Updated undici to 8.12.4.
+
 ## [3.3.0] - 2026-11-14
 
 ### Added
@@ -166,6 +172,9 @@ const { Osmotic } = require('osmotic');
 
 Last release as `@fisknils/osmo`.
 
+[3.3.1]: https://www.npmjs.com/package/osmotic/v/3.3.1
+[3.3.0]: https://www.npmjs.com/package/osmotic/v/3.3.0
+[3.2.0]: https://www.npmjs.com/package/osmotic/v/3.2.0
 [3.1.1]: https://www.npmjs.com/package/osmotic/v/3.1.1
 [3.1.0]: https://www.npmjs.com/package/osmotic/v/3.1.0
 [3.0.0]: https://www.npmjs.com/package/osmotic/v/3.0.0

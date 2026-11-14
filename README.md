@@ -353,7 +353,7 @@ const retry =
 		}
 	};
 
-Osmotic.get('https://example.com').useFetch(retry(2)) /* ... */;
+Osmotic.get('https://example.com').useFetch(retry(2)); /* ... */
 ```
 
 A middleware can carry `onStart` and `onEnd` functions. `useFetch()` registers them
@@ -420,7 +420,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 Osmotic.command('pause', (ms) => (ctx, next) => sleep(ms).then(() => next(ctx)));
 
-Osmotic.get('https://example.com').pause(500).find('a') /* ... */;
+Osmotic.get('https://example.com').pause(500).find('a'); /* ... */
 ```
 
 In TypeScript, declare the new method so the compiler knows about it:
@@ -516,7 +516,7 @@ const { Osmotic } = require('osmotic');
 
 Osmotic.plugins([require('osmotic-plugin-playwright'), require('osmotic-plugin-csv')]);
 
-Osmotic.get('https://example.com') /* ... */;
+Osmotic.get('https://example.com'); /* ... */
 ```
 
 `Osmotic.plugins(list)` returns `Osmotic`, so it can also start a chain directly.
